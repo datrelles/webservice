@@ -1,4 +1,6 @@
 from flask import Blueprint, request, jsonify
+from numpy.core.defchararray import upper
+from os import getenv
 
 from src.function_jwt import validate_token
 from src import oracle
@@ -44,6 +46,31 @@ def atelier():
         stud_json = json.dumps(mydict, indent=2, default=str, ensure_ascii=False).encode('utf8')
         return stud_json
 
+@web_services.route("/atelier_by_code", methods=["GET"])
+def atelier_by_id():
+
+    try:
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur_01 = c.cursor()
+        id = request.args.get('id', None)
+        id = str(upper(id))
+        print(id)
+        sql = "select ROWNUM, P.DESCRIPCION, C.DESCRIPCION,T.DESCRIPCION, T.NOMBRE_CONTACTO, T.TELEFONO1, T.TELEFONO2, T.TELEFONO3, T.DIRECCION, REPLACE(T.RUC,'-','') as ID,T.FECHA_ADICION, T.FECHA_MODIFICACION, T.FECHA_NACIMIENTO from AR_TALLER_SERVICIO_TECNICO T , AR_PROVINCIAS P, ar_ciudades c WHERE T.CODIGO_EMPRESA = 20  and   T.CODIGO_PROVINCIA = P.CODIGO_PROVINCIA (+) and   c.codigo_ciudad(+)    = t.codigo_ciudad and   c.codigo_provincia(+) = t.codigo_provincia  and REPLACE(T.RUC,'-','') = replace(:id,'-','')"
+        cursor = cur_01.execute(sql, [id])
+        c.close
+        row_headers = [x[0] for x in cursor.description]
+        array = cursor.fetchall()
+        empresas = []
+        for result in array:
+            empresa = dict(zip(row_headers, result))
+            empresa['FECHA_ADICION'] = empresa['FECHA_ADICION'].strftime('%Y-%m-%d %H:%M:%S') if empresa['FECHA_ADICION'] is not None else None
+            empresa['FECHA_MODIFICACION'] = empresa['FECHA_MODIFICACION'].strftime('%Y-%m-%d %H:%M:%S') if empresa['FECHA_MODIFICACION'] is not None else None
+            empresa['FECHA_NACIMIENTO'] = empresa['FECHA_NACIMIENTO'].strftime('%Y-%m-%d') if empresa['FECHA_NACIMIENTO'] is not None else None
+            empresas.append(empresa)
+        return json.dumps(empresas)
+    except Exception as ex:
+        raise Exception(ex)
+    return response_body
 
 @web_services.route('/api-packing-list-by-code', methods = ['GET'])
 def byCode():
