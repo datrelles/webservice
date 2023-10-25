@@ -36,7 +36,7 @@ def atelier():
         user = info['username']
         password = info['password']
         array = oracle.execute_sql(
-            'select ROWNUM, P.DESCRIPCION, C.DESCRIPCION,T.DESCRIPCION, T.NOMBRE_CONTACTO, T.TELEFONO1, T.TELEFONO2, T.TELEFONO3, T.DIRECCION, T.RUC,T.FECHA_ADICION, T.FECHA_MODIFICACION, T.FECHA_NACIMIENTO from AR_TALLER_SERVICIO_TECNICO T , AR_PROVINCIAS P, ar_ciudades c WHERE T.CODIGO_EMPRESA = 20  and   T.CODIGO_PROVINCIA = P.CODIGO_PROVINCIA (+) and   c.codigo_ciudad(+)    = t.codigo_ciudad and   c.codigo_provincia(+) = t.codigo_provincia',user,password)
+            'select ROWNUM, P.DESCRIPCION , C.DESCRIPCION,T.DESCRIPCION, T.NOMBRE_CONTACTO, T.TELEFONO1, T.TELEFONO2, T.TELEFONO3, T.DIRECCION, T.RUC,T.FECHA_ADICION, T.FECHA_MODIFICACION, T.FECHA_NACIMIENTO from AR_TALLER_SERVICIO_TECNICO T , AR_PROVINCIAS P, ar_ciudades c WHERE T.CODIGO_EMPRESA = 20  and   T.CODIGO_PROVINCIA = P.CODIGO_PROVINCIA (+) and   c.codigo_ciudad(+)    = t.codigo_ciudad and   c.codigo_provincia(+) = t.codigo_provincia',user,password)
         mydict = create_dict()
         for row in array:
             mydict.add(row[0], (
@@ -54,8 +54,7 @@ def atelier_by_id():
         cur_01 = c.cursor()
         id = request.args.get('id', None)
         id = str(upper(id))
-        print(id)
-        sql = "select ROWNUM, P.DESCRIPCION, C.DESCRIPCION,T.DESCRIPCION, T.NOMBRE_CONTACTO, T.TELEFONO1, T.TELEFONO2, T.TELEFONO3, T.DIRECCION, REPLACE(T.RUC,'-','') as ID,T.FECHA_ADICION, T.FECHA_MODIFICACION, T.FECHA_NACIMIENTO from AR_TALLER_SERVICIO_TECNICO T , AR_PROVINCIAS P, ar_ciudades c WHERE T.CODIGO_EMPRESA = 20  and   T.CODIGO_PROVINCIA = P.CODIGO_PROVINCIA (+) and   c.codigo_ciudad(+)    = t.codigo_ciudad and   c.codigo_provincia(+) = t.codigo_provincia  and REPLACE(T.RUC,'-','') = replace(:id,'-','')"
+        sql = "select ROWNUM, P.DESCRIPCION AS PROVINCIA, C.DESCRIPCION AS CIUDAD, T.DESCRIPCION AS NOMBRE, T.NOMBRE_CONTACTO, T.TELEFONO1, T.TELEFONO2, T.TELEFONO3, T.DIRECCION, REPLACE(T.RUC,'-','') as ID,T.FECHA_ADICION, T.FECHA_MODIFICACION, T.FECHA_NACIMIENTO from AR_TALLER_SERVICIO_TECNICO T , AD_PROVINCIAS P, ad_cantones c WHERE T.CODIGO_EMPRESA = 20 and T.COD_PROVINCIA = P.CODIGO_PROVINCIA (+) and c.codigo_canton(+) = t.cod_canton and c.codigo_provincia(+) = t.cod_provincia and REPLACE(T.RUC,'-','') = replace(:id,'-','') and P.CODIGO_NACION = 1 "
         cursor = cur_01.execute(sql, [id])
         c.close
         row_headers = [x[0] for x in cursor.description]
