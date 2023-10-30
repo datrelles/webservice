@@ -20,31 +20,25 @@ def verify_token_middleware():
 @web_services.route("/atelier", methods=["POST"])
 def atelier():
 
-        class create_dict(dict):
-
-            # __init__ function
-            def __init__(self):
-                self = dict()
-
-                # Function to add key:value
-
-            def add(self, key, value):
-                self[key] = value
-
-        token = request.headers['Authorization'].split(" ")[1]
-        info = validate_token(token, output=True)
-        user = info['username']
-        password = info['password']
-        array = oracle.execute_sql(
-            'select ROWNUM, P.DESCRIPCION , C.DESCRIPCION,T.DESCRIPCION, T.NOMBRE_CONTACTO, T.TELEFONO1, T.TELEFONO2, T.TELEFONO3, T.DIRECCION, T.RUC,T.FECHA_ADICION, T.FECHA_MODIFICACION, T.FECHA_NACIMIENTO from AR_TALLER_SERVICIO_TECNICO T , AR_PROVINCIAS P, ar_ciudades c WHERE T.CODIGO_EMPRESA = 20  and   T.CODIGO_PROVINCIA = P.CODIGO_PROVINCIA (+) and   c.codigo_ciudad(+)    = t.codigo_ciudad and   c.codigo_provincia(+) = t.codigo_provincia',user,password)
-        mydict = create_dict()
-        for row in array:
-            mydict.add(row[0], (
-            {"PROVINCIA": row[1], "CIUDAD": row[2], "NOMBRE TALLER": row[3], "NOMBRE MECANICO": row[4],
-             "NUMERO PRINCIPAL": row[5], "NUMERO ALTERNATIVO": row[6], "NUMERO CONVENCIONAL PRINCIPAL": row[7],
-             "DIRECCION": row[8], "RUC": row[9], "FECHA CREACION": row[10], "FECHA MODIFICACION": row[11], "FECHA NACIMIENTO": row[12]}))
-        stud_json = json.dumps(mydict, indent=2, default=str, ensure_ascii=False).encode('utf8')
-        return stud_json
+    try:
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur_01 = c.cursor()
+        sql = "select ROWNUM, P.DESCRIPCION AS PROVINCIA, C.DESCRIPCION AS CIUDAD, T.DESCRIPCION AS NOMBRE, T.NOMBRE_CONTACTO, T.TELEFONO1, T.TELEFONO2, T.TELEFONO3, T.DIRECCION, REPLACE(T.RUC,'-','') as ID,T.FECHA_ADICION, T.FECHA_MODIFICACION, T.FECHA_NACIMIENTO from AR_TALLER_SERVICIO_TECNICO T , AD_PROVINCIAS P, ad_cantones c WHERE T.CODIGO_EMPRESA = 20 and T.COD_PROVINCIA = P.CODIGO_PROVINCIA (+) and c.codigo_canton(+) = t.cod_canton and c.codigo_provincia(+) = t.cod_provincia and P.CODIGO_NACION = 1 "
+        cursor = cur_01.execute(sql)
+        c.close
+        row_headers = [x[0] for x in cursor.description]
+        array = cursor.fetchall()
+        empresas = []
+        for result in array:
+            empresa = dict(zip(row_headers, result))
+            empresa['FECHA_ADICION'] = empresa['FECHA_ADICION'].strftime('%Y-%m-%d %H:%M:%S') if empresa['FECHA_ADICION'] is not None else None
+            empresa['FECHA_MODIFICACION'] = empresa['FECHA_MODIFICACION'].strftime('%Y-%m-%d %H:%M:%S') if empresa['FECHA_MODIFICACION'] is not None else None
+            empresa['FECHA_NACIMIENTO'] = empresa['FECHA_NACIMIENTO'].strftime('%Y-%m-%d') if empresa['FECHA_NACIMIENTO'] is not None else None
+            empresas.append(empresa)
+        return json.dumps(empresas)
+    except Exception as ex:
+        raise Exception(ex)
+    return response_body
 
 @web_services.route("/atelier_by_code", methods=["GET"])
 def atelier_by_id():
