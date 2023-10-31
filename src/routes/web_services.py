@@ -65,6 +65,68 @@ def atelier_by_id():
         raise Exception(ex)
     return response_body
 
+@web_services.route("/pedidos", methods=["GET"])
+def pedido_by_code():
+
+    try:
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur_01 = c.cursor()
+        code = request.args.get('code', None)
+        id = request.args.get('id', None)
+        sql = """select F.NRO_PEDIDO_EXTERNO pedido, B.NRO_SERIE||'-'||B.FACTURA_MANUAL GUIA, J.COD_PRODUCTO_CLI CODIGO,
+                E.COD_CHASIS chasis, E.COD_MOTOR motor, E.CAMVCPN RAM, H.NOMBRE MARCA, E.MODELO, I.NOMBRE COLOR, E.ANIO,
+                E.PAIS_ORIGEN,  E.SUBCLASE CLASE, E.CLASE TIPO, E.CILINDRAJE
+                from comprobante a, st_comprobante_guia_remision b,
+                MOVIMIENTO C, ST_SERIE_MOVIMIENTO D,
+                st_prod_packing_list E,
+                ST_PEDIDOS_DETALLES F, producto G,
+                MARCA H, ST_COLOR I, ST_PRODUCTO_CLIENTE J
+                where a.empresa                           =             20
+                and   a.tipo_comprobante                  =             'NE'
+                and   B.EMPRESA                           =             A.EMPRESA
+                AND   B.TIPO_COMPROBANTE                  =             A.TIPO_COMPROBANTE
+                AND   B.COD_COMPROBANTE                   =             A.COD_COMPROBANTE
+                AND   B.IDENTIFICACION_DESTINATARIO       =             :id
+                AND   C.EMPRESA                           =             B.EMPRESA
+                AND   C.TIPO_COMPROBANTE                  =             B.TIPO_COMPROBANTE
+                AND   C.COD_COMPROBANTE                   =             B.COD_COMPROBANTE
+                AND   C.DEBITO_CREDITO                    =             2
+                AND   D.COD_COMPROBANTE                   =             C.COD_COMPROBANTE
+                AND   D.TIPO_COMPROBANTE                  =             C.TIPO_COMPROBANTE
+                AND   D.EMPRESA                           =             C.EMPRESA
+                AND   D.SECUENCIA                         =             C.SECUENCIA
+                AND   D.COD_PRODUCTO                      =             C.COD_PRODUCTO
+                AND   E.COD_MOTOR                         =             D.NUMERO_SERIE
+                AND   E.COD_PRODUCTO                      =             D.COD_PRODUCTO
+                AND   E.EMPRESA                           =             D.EMPRESA
+                AND   F.COD_PEDIDO                        =             A.PEDIDO
+                AND   F.SECUENCIA                         =             D.SECUENCIA
+                AND   F.COD_TIPO_PEDIDO                   =             'PC'
+                AND   F.EMPRESA                           =             D.EMPRESA
+                AND   F.COD_PRODUCTO                      =             D.COD_PRODUCTO
+                AND   F.NRO_PEDIDO_EXTERNO                =             :code
+                AND   G.EMPRESA                           =             F.EMPRESA
+                AND   G.COD_PRODUCTO                      =             F.COD_PRODUCTO
+                AND   H.COD_MARCA                         =             G.COD_MARCA
+                AND   H.EMPRESA                           =             G.EMPRESA
+                AND   I.COD_COLOR                         =             E.COD_COLOR
+                AND   J.EMPRESA                           =             E.EMPRESA
+                AND   J.COD_PRODUCTO                      =             E.COD_PRODUCTO
+                AND   J.COD_CLIENTE                       =             B.IDENTIFICACION_DESTINATARIO"""
+        cursor = cur_01.execute(sql, [id, code])
+        c.close
+        row_headers = [x[0] for x in cursor.description]
+        array = cursor.fetchall()
+        pedidos = []
+        for result in array:
+            pedido = dict(zip(row_headers, result))
+            pedidos.append(pedido)
+        return json.dumps(pedidos)
+    except Exception as ex:
+        raise Exception(ex)
+    return response_body
+
+
 @web_services.route('/api-packing-list-by-code', methods = ['GET'])
 def byCode():
     class create_dict(dict):
