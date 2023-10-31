@@ -73,6 +73,8 @@ def pedido_by_code():
         cur_01 = c.cursor()
         code = request.args.get('code', None)
         id = request.args.get('id', None)
+        if code is None or id is None:
+            return jsonify({"error": "Se requieren ambos parámetros 'PEDIDO EXTERNO(code)' Y 'RUC (id)' en la solicitud."}), 400
         sql = """select F.NRO_PEDIDO_EXTERNO pedido, B.NRO_SERIE||'-'||B.FACTURA_MANUAL GUIA, J.COD_PRODUCTO_CLI CODIGO,
                 E.COD_CHASIS chasis, E.COD_MOTOR motor, E.CAMVCPN RAM, H.NOMBRE MARCA, E.MODELO, I.NOMBRE COLOR, E.ANIO,
                 E.PAIS_ORIGEN,  E.SUBCLASE CLASE, E.CLASE TIPO, E.CILINDRAJE
