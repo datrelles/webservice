@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from numpy.core.defchararray import upper
 from os import getenv
+from datetime import datetime
 
 from src.function_jwt import validate_token
 from src import oracle
@@ -73,46 +74,15 @@ def pedido_by_code():
         cur_01 = c.cursor()
         code = request.args.get('code', None)
         id = request.args.get('id', None)
-        sql = """select F.NRO_PEDIDO_EXTERNO pedido, B.NRO_SERIE||'-'||B.FACTURA_MANUAL GUIA, J.COD_PRODUCTO_CLI CODIGO,
-                E.COD_CHASIS chasis, E.COD_MOTOR motor, E.CAMVCPN RAM, H.NOMBRE MARCA, E.MODELO, I.NOMBRE COLOR, E.ANIO,
-                E.PAIS_ORIGEN,  E.SUBCLASE CLASE, E.CLASE TIPO, E.CILINDRAJE
-                from comprobante a, st_comprobante_guia_remision b,
-                MOVIMIENTO C, ST_SERIE_MOVIMIENTO D,
-                st_prod_packing_list E,
-                ST_PEDIDOS_DETALLES F, producto G,
-                MARCA H, ST_COLOR I, ST_PRODUCTO_CLIENTE J
-                where a.empresa                           =             20
-                and   a.tipo_comprobante                  =             'NE'
-                and   B.EMPRESA                           =             A.EMPRESA
-                AND   B.TIPO_COMPROBANTE                  =             A.TIPO_COMPROBANTE
-                AND   B.COD_COMPROBANTE                   =             A.COD_COMPROBANTE
-                AND   B.IDENTIFICACION_DESTINATARIO       =             :id
-                AND   C.EMPRESA                           =             B.EMPRESA
-                AND   C.TIPO_COMPROBANTE                  =             B.TIPO_COMPROBANTE
-                AND   C.COD_COMPROBANTE                   =             B.COD_COMPROBANTE
-                AND   C.DEBITO_CREDITO                    =             2
-                AND   D.COD_COMPROBANTE                   =             C.COD_COMPROBANTE
-                AND   D.TIPO_COMPROBANTE                  =             C.TIPO_COMPROBANTE
-                AND   D.EMPRESA                           =             C.EMPRESA
-                AND   D.SECUENCIA                         =             C.SECUENCIA
-                AND   D.COD_PRODUCTO                      =             C.COD_PRODUCTO
-                AND   E.COD_MOTOR                         =             D.NUMERO_SERIE
-                AND   E.COD_PRODUCTO                      =             D.COD_PRODUCTO
-                AND   E.EMPRESA                           =             D.EMPRESA
-                AND   F.COD_PEDIDO                        =             A.PEDIDO
-                AND   F.SECUENCIA                         =             D.SECUENCIA
-                AND   F.COD_TIPO_PEDIDO                   =             'PC'
-                AND   F.EMPRESA                           =             D.EMPRESA
-                AND   F.COD_PRODUCTO                      =             D.COD_PRODUCTO
-                AND   F.NRO_PEDIDO_EXTERNO                =             :code
-                AND   G.EMPRESA                           =             F.EMPRESA
-                AND   G.COD_PRODUCTO                      =             F.COD_PRODUCTO
-                AND   H.COD_MARCA                         =             G.COD_MARCA
-                AND   H.EMPRESA                           =             G.EMPRESA
-                AND   I.COD_COLOR                         =             E.COD_COLOR
-                AND   J.EMPRESA                           =             E.EMPRESA
-                AND   J.COD_PRODUCTO                      =             E.COD_PRODUCTO
-                AND   J.COD_CLIENTE                       =             B.IDENTIFICACION_DESTINATARIO"""
+        if code is None or id is None:
+            return jsonify(
+                {"error": "Se requieren ambos parámetros 'PEDIDO EXTERNO(code)' Y 'RUC (id)' en la solicitud."}), 400
+        sql = """select V.pedido, V.GUIA, V.CODIGO,
+                V.chasis, V.motor, V.RAM, V.MARCA, V.MODELO, V.COLOR, V.ANIO,
+                V.PAIS_ORIGEN,  V.CLASE, V.TIPO, V.CILINDRAJE
+                from VT_PED_GUIAS_LAGANGA V
+                where V.IDENTIFICACION_DESTINATARIO       =             :id
+                AND   V.PEDIDO                =             :code"""
         cursor = cur_01.execute(sql, [id, code])
         c.close
         row_headers = [x[0] for x in cursor.description]
@@ -126,6 +96,46 @@ def pedido_by_code():
         raise Exception(ex)
     return response_body
 
+@web_services.route("/pedidos_by_date", methods=["GET"])
+def pedido_by_date():
+
+    try:
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur_01 = c.cursor()
+        from_date = request.args.get('fecha_desde', None)
+        to_date = request.args.get('fecha_hasta', None)
+        id = request.args.get('id', None)
+        if from_date is None or id is None or to_date is None:
+            return jsonify(
+                {"error": "Se requieren parámetros 'RUC (id)' y fechas en la solicitud."}), 400
+        try:
+            from_date_n = datetime.strptime(from_date, '%d/%m/%Y')
+            to_date_n = datetime.strptime(to_date, '%d/%m/%Y')
+            if from_date_n > to_date_n:
+                return jsonify(
+                    {"error": "Fecha Desde es mayor a Fecha hasta"}), 400
+        except Exception as ex:
+            return jsonify(
+                        {"error": "Formato de fechas incorrecto"}), 400
+
+        sql = """select *
+                from VT_PED_GUIAS_LAGANGA V
+                where V.IDENTIFICACION_DESTINATARIO = :id
+                AND V.FECHA >= TO_DATE(:from_date, 'DD/MM/YYYY')  
+                AND V.FECHA <= TO_DATE(:to_date, 'DD/MM/YYYY')"""
+        cursor = cur_01.execute(sql, [id, from_date, to_date])
+        c.close
+        row_headers = [x[0] for x in cursor.description]
+        array = cursor.fetchall()
+        pedidos = []
+        for result in array:
+            pedido = dict(zip(row_headers, result))
+            pedido['FECHA'] = pedido['FECHA'].strftime('%Y-%m-%d') if pedido['FECHA'] is not None else None
+            pedidos.append(pedido)
+        return json.dumps(pedidos)
+    except Exception as ex:
+        raise Exception(ex)
+    return response_body
 
 @web_services.route('/api-packing-list-by-code', methods = ['GET'])
 def byCode():
