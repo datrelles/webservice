@@ -83,6 +83,7 @@ def pedido_by_code():
                 from VT_PED_GUIAS_LAGANGA V
                 where V.IDENTIFICACION_DESTINATARIO       =             :id
                 AND   V.PEDIDO                =             :code"""
+
         cursor = cur_01.execute(sql, [id, code])
         c.close
         row_headers = [x[0] for x in cursor.description]
