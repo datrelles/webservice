@@ -195,5 +195,171 @@ def byYear():
     stud_json = json.dumps(mydict, indent=2, default=str, ensure_ascii=False).encode('utf8')
     return stud_json
 
+#Api Product Img+Info
+@web_services.route('/imageByCode',  methods = ['GET'])
+def imageByCode():
+    try:
+        #buscar imagen
+        c=oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur_01=c.cursor()
+        #Escribe la consulta
+        cod_code =request.args.get('code')
+        if cod_code is None:
+            return jsonify({"error": "Se requiere el parámetro 'cod_material' en la solicitud."}), 400
+        sql_query   =   """
+            SELECT 
+            P.COD_PRODUCTO,
+            P.NOMBRE,
+            P.IVA,
+            P.ICE,
+            M.NOMBRE AS MARCA,
+            BUF.ES_BUFFER AS CONTROL_BUFFER,
+            C.nombre color,
+            T.NOMBRE categoria
+            FROM 
+            PRODUCTO P
+            JOIN 
+            MARCA M ON  P.COD_MARCA= M.COD_MARCA
+            JOIN
+            st_material_imagen IM ON  P.COD_PRODUCTO= IM.COD_MATERIAL
+            JOIN
+            st_producto_buffer BUF ON  P.COD_PRODUCTO= BUF.COD_PRODUCTO
+            JOIN
+            st_color c ON p.partida= c.cod_color
+            JOIN 
+            TG_MODELO_ITEM T ON P.COD_MODELO_CAT1=  T.COD_MODELO AND T.COD_ITEM = P.COD_ITEM_CAT1
+            WHERE 
+            P.COD_PRODUCTO=: cod_code
+            AND  
+            P.EMPRESA = 20
+            AND
+            T.EMPRESA = P.EMPRESA
+
+"""
+        #ejecuta la consulta SQL
+        cursor=cur_01.execute(sql_query, {'cod_code':cod_code})
+        resultado=cursor.fetchone()
+        if resultado:
+            code=resultado[0]
+            name=resultado[1]
+            iva=resultado[2]
+            ice=resultado[3]
+            marca=resultado[4]
+            buffer=resultado[5]
+            color=resultado[6]
+            category=resultado[7]
+            host = request.host
+            imageurl=f"http://{host}/imageApi/img?code={code}"
+            response_data={
+                "img":imageurl,
+                "code": code,
+                "name": name,
+                "iva": iva,
+                "ice": ice,
+                "marca": marca,
+                "buffer": buffer,
+                "color": color,
+                "category": category,
+            }
+            c.close()
+            return jsonify(response_data), 200, {'Content-Type': 'application/json'}
+        else:
+            return jsonify({"error": "No se encontraron archivos para el material especificado."}), 404
+
+
+    except Exception as ex:
+            print (ex)
+            return jsonify({"error":"Ocurrio un error al recuperar archivos"}), 500
+
+
+@web_services.route('/searchProduct',  methods = ['GET'])
+def searchProduct():
+    try:
+        #buscar imagen
+        page = int(request.args.get('page'))
+        items_per_page = 50
+        offset = (page - 1) * items_per_page
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur_01 = c.cursor()
+        #Escribe la consulta
+        sql_query   =   """
+            SELECT 
+            P.COD_PRODUCTO,
+            P.NOMBRE,
+            P.IVA,
+            P.ICE,
+            CASE 
+                WHEN M.NOMBRE = 'SHINERAY - REPUESTOS' THEN 'SHINERAY'
+                ELSE M.NOMBRE
+            END AS MARCA,
+            BUF.ES_BUFFER AS CONTROL_BUFFER,
+            C.nombre color,
+            T.NOMBRE categoria_SKU,
+            substr(ks_reporte.tipo_modelo_cat(p.empresa, p.cod_producto),1,INSTR(ks_reporte.tipo_modelo_cat(p.empresa, p.cod_producto),CHR(9))-1) categoria_moto,
+            substr(substr(ks_reporte.tipo_modelo_cat(p.empresa, p.cod_producto),INSTR(ks_reporte.tipo_modelo_cat(p.empresa, p.cod_producto),CHR(9))+1),1,instr(substr(ks_reporte.tipo_modelo_cat(p.empresa, p.cod_producto),INSTR(ks_reporte.tipo_modelo_cat(p.empresa, p.cod_producto),CHR(9))+1),CHR(9))-1) modelo_moto
+            FROM 
+            PRODUCTO P
+            JOIN 
+            MARCA M ON  P.COD_MARCA= M.COD_MARCA
+            JOIN
+            st_material_imagen IM ON  P.COD_PRODUCTO= IM.COD_MATERIAL
+            JOIN
+            st_producto_buffer BUF ON  P.COD_PRODUCTO= BUF.COD_PRODUCTO
+            JOIN
+            ST_COLOR C ON P.PARTIDA = C.COD_COLOR
+            JOIN 
+            TG_MODELO_ITEM T ON P.COD_MODELO_CAT1=  T.COD_MODELO AND T.COD_ITEM = P.COD_ITEM_CAT1
+            WHERE 
+            P.EMPRESA = 20
+            AND
+            T.EMPRESA = P.EMPRESA
+
+"""
+        #ejecuta la consulta SQL
+        cursor = cur_01.execute(sql_query)
+        resultados = cursor.fetchall()
+        paginated_results = resultados[offset:offset + items_per_page]
+
+        if paginated_results:
+            response_data = []
+            for resultado in paginated_results:
+                code = resultado[0]
+                name = resultado[1]
+                iva = resultado[2]
+                ice = resultado[3]
+                marca = resultado[4]
+                buffer = resultado[5]
+                color = resultado[6]
+                category = resultado[7]
+                motoCategory=resultado[8]
+                motoModel=resultado[9]
+                host = request.host
+                imageurl = f"http://{host}/imageApi/img?code={code}"
+
+                response_data.append({
+                    "img": imageurl,
+                    "code": code,
+                    "name": name,
+                    "iva": iva,
+                    "ice": ice,
+                    "marca": marca,
+                    "buffer": buffer,
+                    "color": color,
+                    "category_sku": category,
+                    "moto_Category": motoCategory,
+                    "moto_Model":motoModel
+                })
+
+            c.close()
+            return jsonify(response_data), 200, {'Content-Type': 'application/json'}
+        else:
+            c.close()
+            return jsonify({"error": "No se encontraron archivos para el material especificado."}), 404
+
+
+    except Exception as ex:
+            print (ex)
+            return jsonify({"error":"Ocurrio un error al recuperar archivos"}), 500
+
 
 
