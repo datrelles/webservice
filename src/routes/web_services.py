@@ -195,5 +195,126 @@ def byYear():
     stud_json = json.dumps(mydict, indent=2, default=str, ensure_ascii=False).encode('utf8')
     return stud_json
 
+@web_services.route('/sri_motos_matriculas', methods=['POST'])
+def cargaMatriculas():
+    try:
+        data = request.get_json()
+        print(data)
+        anio = data.get('anio')
+        page_size = 100
+        page_number = data.get('page',1)
+        offset = (page_number-1)*page_size
+        print(anio)
+        # Modifica tu consulta SQL para incluir LIMIT y OFFSET
+        # Obtener la conexión y el cursor
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur_01 = c.cursor()
+        sql = """SELECT CAMVCPN
+                 FROM (
+                     SELECT CAMVCPN, ROW_NUMBER() OVER (ORDER BY CAMVCPN) AS r
+                     FROM vt_vta_consigna_motos
+                 )
+                 WHERE r BETWEEN :offset + 1 AND :offset + :page_size"""
+
+        result = cur_01.execute(sql, {'page_size': page_size, 'offset': offset}).fetchall()
+        json_result = [{'CAMVCPN': row[0]} for row in result]
+        cur_01.close()
+        c.close()
+
+        return jsonify({'result': json_result})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@web_services.route('/sri_motos_matriculas_save', methods=['POST'])
+def saveMatriculas():
+    try:
+        data = request.get_json()
+        # Obtener la conexión y el cursor
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur_01 = c.cursor()
+
+        for record in data:
+            if record.get("PLACA") == '':
+                print('vacion')
+                continue
+
+            # Formatear las fechas desde los datos JSON
+            fecha_ultima_matricula = datetime.strptime(record["FECHA ULTIMA MATRICULA"], '%d/%m/%Y')
+            fecha_de_compra = datetime.strptime(record[" FECHA DE COMPRA"], '%d/%m/%Y')
+            fecha_caducidad_matricula = datetime.strptime(record["FECHA CADUCIDAD MATRICULA"], '%d/%m/%Y')
+            fecha_de_revision = datetime.strptime(record[" FECHA DE REVISION"], '%d/%m/%Y')
+            # Verificar si el registro ya existe
+            select_query = "SELECT COUNT(*) FROM ST_MATRICULACION_MOTOS WHERE PLACA = :1"
+            cur_01.execute(select_query, (record["PLACA"],))
+            result = cur_01.fetchone()
+
+            # Si el registro ya existe, continuar a la siguiente iteración
+            if result and result[0] > 0:
+                print(f"Registro con PLACA {record['PLACA']} ya existe. Saltando inserción.")
+                continue
+
+            # Preparar la consulta de inserción
+            insert_query = """
+                INSERT INTO ST_MATRICULACION_MOTOS (
+                    EMPRESA, NOMBRE, TIPO_IDENTIFICACION, IDENTIFICACION, DIRECCION, TELEFONO,
+                    PLACA, CAMV_O_CPN, MARCA, MODELO, PAIS, ANIO, CILINDRAJE, CLASE, SERVICIO,
+                    FECHA_ULTIMA_MATRICULA, FECHA_DE_COMPRA, FECHA_CADUCIDAD_MATRICULA,
+                    ANIO_ULTIMO_PAGO, CANTON, ENTIDAD_POLICIAL, ESTADO_MATRICULADO,
+                    ESTADO_EXONERACION, COLOR_1, PROHIBICION_DE_ENAJENAR, COLOR_2,
+                    FECHA_DE_REVISION, TIPO_DE_USO_DEL_VEHICULO, ESTADO, OBSERVACION
+                ) VALUES (
+                    :1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16,
+                    :17,:18, :19, :20, :21, :22, :23, :24, :25, :26, :27, :28, :29, :30
+                )
+            """
+            values = (
+                20,  # Replace with the correct value for EMPRESA
+                record["NOMBRE"],
+                record["TIPO IDENTIFICACION"],
+                record["IDENTIFICACION"],
+                record["DIRECCION"],
+                record["TELEFONO"],
+                record["PLACA"],
+                record[" CAMV O CPN"],
+                record["MARCA"],
+                record[" MODELO"],
+                record["PAIS"],
+                record[" ANO"],
+                record["CILINDRAJE"],
+                record["CLASE"],
+                record[" SERVICIO"],
+                fecha_ultima_matricula,
+                fecha_de_compra,
+                fecha_caducidad_matricula,
+                record[" ANO ULTIMO PAGO"],
+                record["CANTON"],
+                record[" ENTIDAD POLICIAL"],
+                record["ESTADO MATRICULADO"],
+                record[" ESTADO EXONERACION"],
+                record["COLOR 1"],
+                record[" PROHIBICION DE ENAJENAR"],
+                record["COLOR 2"],
+                fecha_de_revision,
+                record["TIPO DE USO DEL VEHICULO"],
+                record["ESTADO"],
+                record[" OBSERVACION"]
+            )
+
+            # Ejecutar la consulta de inserción
+            cur_01.execute(insert_query, values)
+
+        # Confirmar la transacción y cerrar los cursores y la conexión
+        c.commit()
+        cur_01.close()
+        c.close()
+
+        return jsonify({'result': 'complete'})
+
+    except Exception as e:
+        print(e)
+        return jsonify({'error': str(e)}), 500
+
 
 
