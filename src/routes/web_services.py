@@ -201,7 +201,7 @@ def cargaMatriculas():
         data = request.get_json()
         print(data)
         anio = data.get('anio')
-        page_size = 10
+        page_size = 100
         page_number = data.get('page',1)
         offset = (page_number-1)*page_size
         print(anio)
@@ -213,14 +213,11 @@ def cargaMatriculas():
                  FROM (
                      SELECT CAMVCPN, ROW_NUMBER() OVER (ORDER BY CAMVCPN) AS r
                      FROM vt_vta_consigna_motos
-                     WHERE ANIO = :anio
                  )
                  WHERE r BETWEEN :offset + 1 AND :offset + :page_size"""
 
-        result = cur_01.execute(sql, {'anio': anio, 'page_size': page_size, 'offset': offset}).fetchall()
+        result = cur_01.execute(sql, {'page_size': page_size, 'offset': offset}).fetchall()
         json_result = [{'CAMVCPN': row[0]} for row in result]
-
-        print(json_result)
         cur_01.close()
         c.close()
 
@@ -234,13 +231,12 @@ def cargaMatriculas():
 def saveMatriculas():
     try:
         data = request.get_json()
-        print(data)
         # Obtener la conexión y el cursor
         c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
         cur_01 = c.cursor()
 
         for record in data:
-            if record.get("Placa") == '':
+            if record.get("PLACA") == '':
                 print('vacion')
                 continue
 
@@ -249,11 +245,6 @@ def saveMatriculas():
             fecha_de_compra = datetime.strptime(record[" FECHA DE COMPRA"], '%d/%m/%Y')
             fecha_caducidad_matricula = datetime.strptime(record["FECHA CADUCIDAD MATRICULA"], '%d/%m/%Y')
             fecha_de_revision = datetime.strptime(record[" FECHA DE REVISION"], '%d/%m/%Y')
-            print(type(fecha_ultima_matricula))
-            print(fecha_de_compra)
-            print(fecha_caducidad_matricula)
-            print(fecha_de_revision)
-
             # Verificar si el registro ya existe
             select_query = "SELECT COUNT(*) FROM ST_MATRICULACION_MOTOS WHERE PLACA = :1"
             cur_01.execute(select_query, (record["PLACA"],))
