@@ -4,7 +4,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import datetime as dt
 
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-
+#from flask_wtf.csrf import CSRFProtect
 from numpy.core.defchararray import upper
 from requests.auth import HTTPBasicAuth
 
@@ -15,7 +15,7 @@ from src.routes.web_services import web_services
 from src.routes.auth import auth
 from dotenv import load_dotenv, find_dotenv
 from src.models.ModelUser import ModelUser
-from src.models.entities.User import Usergit
+from src.models.entities.User import User
 from flask_login import LoginManager, login_user,logout_user, login_required
 from os import getenv
 import dotenv
