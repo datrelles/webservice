@@ -204,11 +204,9 @@ def cargaMatriculas():
     try:
         data = request.get_json()
         print(data)
-        anio = data.get('anio')
         page_size = 100
         page_number = data.get('page',1)
         offset = (page_number-1)*page_size
-        print(anio)
         # Modifica tu consulta SQL para incluir LIMIT y OFFSET
         # Obtener la conexión y el cursor
         c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
@@ -320,5 +318,81 @@ def saveMatriculas():
         print(e)
         return jsonify({'error': str(e)}), 500
 
+@web_services.route('/sri_doc_elec_save', methods=['POST'])
+def saveElecDoc():
+    try:
+        # Obtener la conexión y el cursor
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+        insert_query = """
+                   INSERT INTO CONTABILIDAD.TC_DOC_ELEC_RECIBIDOS (
+                       comprobante,
+                       serie_comprobante,
+                       ruc_emisor,
+                       razon_social_emisor,
+                       fecha_emision,
+                       fecha_autorizacion,
+                       tipo_emision,
+                       numero_documento_modificado,
+                       identificacion_receptor,
+                       clave_acceso,
+                       numero_autorizacion,
+                       importe_total
+                   ) VALUES (
+                       :comprobante,
+                       :serie_comprobante,
+                       :ruc_emisor,
+                       :razon_social_emisor,
+                       TO_DATE(:fecha_emision, 'DD/MM/YYYY'),
+                       TO_TIMESTAMP(:fecha_autorizacion, 'DD/MM/YYYY HH24:MI:SS'),
+                       :tipo_emision,
+                       :numero_documento_modificado,
+                       :identificacion_receptor,
+                       :clave_acceso,
+                       :numero_autorizacion,
+                       :importe_total
+                   )
+               """
 
+        # Obtener los datos JSON del request
+        data = request.get_json()
+        print(data)
 
+        # Iterar sobre los elementos del JSON y realizar la inserción en la tabla
+        for record in data:
+            # Mapear valores del JSON a los nombres de los parámetros en la consulta de inserción
+            values = {
+                "comprobante": record.get("COMPROBANTE"),
+                "serie_comprobante": record.get("SERIE_COMPROBANTE"),
+                "ruc_emisor": record.get("RUC_EMISOR"),
+                "razon_social_emisor": record.get("RAZON_SOCIAL_EMISOR"),
+                "fecha_emision": record.get("FECHA_EMISION"),
+                "fecha_autorizacion": record.get("FECHA_AUTORIZACION"),
+                "tipo_emision": record.get("TIPO_EMISION"),
+                "numero_documento_modificado": record.get("NUMERO_DOCUMENTO_MODIFICADO"),
+                "identificacion_receptor": record.get("IDENTIFICACION_RECEPTOR"),
+                "clave_acceso": record.get("CLAVE_ACCESO"),
+                "numero_autorizacion": record.get("NUMERO_AUTORIZACION"),
+                "importe_total": record.get("IMPORTE_TOTAL")
+            }
+
+            # Verificar si el registro ya existe
+            select_query = """
+                            SELECT 1 FROM CONTABILIDAD.TC_DOC_ELEC_RECIBIDOS
+                            WHERE RUC_EMISOR = :ruc_emisor AND SERIE_COMPROBANTE = :serie_comprobante
+                        """
+            cursor.execute(select_query,
+                           {"ruc_emisor": values["ruc_emisor"], "serie_comprobante": values["serie_comprobante"]})
+            existing_record = cursor.fetchone()
+
+            # Si el registro no existe, realizar la inserción
+            if not existing_record:
+                cursor.execute(insert_query, values)
+
+        # Commit de la transacción y cerrar la conexión
+        c.commit()
+        c.close()
+        return jsonify({"status": "success", "message": "Datos insertados correctamente"}), 200
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
