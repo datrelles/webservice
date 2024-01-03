@@ -363,7 +363,7 @@ def searchProduct():
                 cod_unidad=resultado[13]
                 precio = resultado[14]
                 stock = resultado[15]
-                host = '200.105.245.182:5001'
+                host = '200.105.245.182:5000'
                 imageurl = f"http://{host}/imageApi/img?code={code}"
 
                 response_data.append({
