@@ -283,7 +283,7 @@ def searchProduct():
         cur_01 = c.cursor()
         #Escribe la consulta
         sql_query   =   """
-            SELECT 
+ SELECT
             P.COD_PRODUCTO,
             P.NOMBRE,
             P.IVA,
@@ -295,24 +295,48 @@ def searchProduct():
             BUF.ES_BUFFER AS CONTROL_BUFFER,
             C.nombre color,
             T.NOMBRE categoria_SKU,
+            l.cod_agencia,
+            b.bodega,
+            b.nombre,
             substr(ks_reporte.tipo_modelo_cat(p.empresa, p.cod_producto),1,INSTR(ks_reporte.tipo_modelo_cat(p.empresa, p.cod_producto),CHR(9))-1) categoria_moto,
-            substr(substr(ks_reporte.tipo_modelo_cat(p.empresa, p.cod_producto),INSTR(ks_reporte.tipo_modelo_cat(p.empresa, p.cod_producto),CHR(9))+1),1,instr(substr(ks_reporte.tipo_modelo_cat(p.empresa, p.cod_producto),INSTR(ks_reporte.tipo_modelo_cat(p.empresa, p.cod_producto),CHR(9))+1),CHR(9))-1) modelo_moto
+            substr(substr(ks_reporte.tipo_modelo_cat(p.empresa, p.cod_producto),INSTR(ks_reporte.tipo_modelo_cat(p.empresa, p.cod_producto),CHR(9))+1),1,instr(substr(ks_reporte.tipo_modelo_cat(p.empresa, p.cod_producto),INSTR(ks_reporte.tipo_modelo_cat(p.empresa, p.cod_producto),CHR(9))+1),CHR(9))-1) modelo_moto,
+            l.cod_unidad,
+            l.precio,
+            KS_INVENTARIO.consulta_existencia(20,l.cod_agencia,P.COD_PRODUCTO,'U',TO_DATE(sysdate, 'YYYY/MM/DD'),1,'Z',1) STOCK
             FROM 
-            PRODUCTO P
-            JOIN 
-            MARCA M ON  P.COD_MARCA= M.COD_MARCA
-            JOIN
-            st_material_imagen IM ON  P.COD_PRODUCTO= IM.COD_MATERIAL
-            JOIN
-            st_producto_buffer BUF ON  P.COD_PRODUCTO= BUF.COD_PRODUCTO
-            JOIN
-            ST_COLOR C ON P.PARTIDA = C.COD_COLOR
-            JOIN 
-            TG_MODELO_ITEM T ON P.COD_MODELO_CAT1=  T.COD_MODELO AND T.COD_ITEM = P.COD_ITEM_CAT1
-            WHERE 
-            P.EMPRESA = 20
-            AND
-            T.EMPRESA = P.EMPRESA
+            PRODUCTO P, 
+            MARCA M,
+            st_material_imagen IM,
+            st_producto_buffer BUF,
+            ST_COLOR C ,
+            TG_MODELO_ITEM T,
+            ST_LISTA_PRECIO l,
+            bodega b
+             
+            WHERE     P.EMPRESA                     = 20
+            AND       M.COD_MARCA                   = P.COD_MARCA
+            AND       M.EMPRESA                     = P.EMPRESA
+            AND       IM.COD_TIPO_MATERIAL          = 'PRO'
+            AND       IM.COD_MATERIAL               = P.COD_PRODUCTO
+            AND       IM.EMPRESA                    = P.EMPRESA
+            AND       BUF.COD_PRODUCTO              = P.COD_PRODUCTO
+            AND       BUF.EMPRESA                   = P.EMPRESA
+            AND       C.COD_COLOR                   = P.PARTIDA
+            AND       T.EMPRESA                     = P.EMPRESA
+            AND       T.COD_MODELO                  = P.COD_MODELO_CAT1
+            AND       T.COD_ITEM                    = P.COD_ITEM_CAT1
+            AND       L.COD_PRODUCTO                = P.COD_PRODUCTO
+            AND       L.COD_AGENCIA                 = 50
+            AND       L.COD_UNIDAD                  = P.COD_UNIDAD
+            AND       L.COD_FORMA_PAGO              = 'EFE'
+            AND       L.COD_DIVISA                  = 'DOLARES'
+            AND       L.COD_MODELO_CLI              = 'CLI1'
+            AND       L.COD_ITEM_CLI                = 'CF'
+            AND       L.ESTADO_GENERACION           = 'R' 
+            AND      (L.FECHA_FINAL                 IS NULL
+            OR        L.FECHA_FINAL                 >= TRUNC(SYSDATE))
+            and       b.empresa                     = l.empresa
+            and       b.bodega                      = l.cod_agencia
 
 """
         #ejecuta la consulta SQL
@@ -331,9 +355,15 @@ def searchProduct():
                 buffer = resultado[5]
                 color = resultado[6]
                 category = resultado[7]
-                motoCategory=resultado[8]
-                motoModel=resultado[9]
-                host = request.host
+                cod_agencia = resultado[8]
+                bodega = resultado[9]
+                nombre = resultado[10]
+                motoCategory=resultado[11]
+                motoModel=resultado[12]
+                cod_unidad=resultado[13]
+                precio = resultado[14]
+                stock = resultado[15]
+                host = '200.105.245.182:5001'
                 imageurl = f"http://{host}/imageApi/img?code={code}"
 
                 response_data.append({
@@ -346,8 +376,14 @@ def searchProduct():
                     "buffer": buffer,
                     "color": color,
                     "category_sku": category,
+                    "codigo agencia": cod_agencia,
+                    "bodega": bodega,
+                    "nombre": nombre,
                     "moto_Category": motoCategory,
-                    "moto_Model":motoModel
+                    "moto_Model": motoModel,
+                    "cod_unidad": cod_unidad,
+                    "precio": precio,
+                    "stock": stock
                 })
 
             c.close()
