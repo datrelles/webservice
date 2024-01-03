@@ -4,6 +4,10 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import datetime as dt
 
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+
+
+#from flask_wtf.csrf import CSRFProtect
+
 from numpy.core.defchararray import upper
 
 from src import oracle

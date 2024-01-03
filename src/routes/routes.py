@@ -1022,3 +1022,25 @@ def eliminar_orden_compra_packinglist(cod_po, empresa, tipo_comprobante):
     except Exception as e:
         logger.exception(f"Error al eliminar: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/doc_elect_sri', methods=['POST'])
+@jwt_required()
+@cross_origin()
+def cargaLote():
+    try:
+        data = request.get_json()
+        print(data)
+        tracking = StOrdenCompraTracking(
+            #cod_po = data['cod_po'],
+            #empresa = data['empresa'],
+            #tipo_comprobante = data['tipo_comprobante'],
+        )
+       # db.session.add(kingtrac)
+        #db.session.commit()
+        return jsonify({'mensaje': 'Tracking de orden de compra creado exitosamente.'})
+
+    except Exception as e:
+        logger.exception(f"Error al consultar: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
