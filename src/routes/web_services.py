@@ -2,12 +2,11 @@ from flask import Blueprint, request, jsonify
 from numpy.core.defchararray import upper
 from os import getenv
 from datetime import datetime
-
+import cx_Oracle
 from src.function_jwt import validate_token
 from src import oracle
 
 import json
-
 
 web_services = Blueprint("web_services", __name__)
 
@@ -15,12 +14,11 @@ web_services = Blueprint("web_services", __name__)
 @web_services.before_request
 def verify_token_middleware():
     token = request.headers['Authorization'].split(" ")[1]
-    return validate_token(token,output=False)
+    return validate_token(token, output=False)
 
 
 @web_services.route("/atelier", methods=["POST"])
 def atelier():
-
     try:
         c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
         cur_01 = c.cursor()
@@ -32,20 +30,25 @@ def atelier():
         empresas = []
         for result in array:
             empresa = dict(zip(row_headers, result))
-            empresa['FECHA_ADICION'] = empresa['FECHA_ADICION'].strftime('%Y-%m-%d %H:%M:%S') if empresa['FECHA_ADICION'] is not None else None
-            empresa['FECHA_MODIFICACION'] = empresa['FECHA_MODIFICACION'].strftime('%Y-%m-%d %H:%M:%S') if empresa['FECHA_MODIFICACION'] is not None else None
-            empresa['FECHA_NACIMIENTO'] = empresa['FECHA_NACIMIENTO'].strftime('%Y-%m-%d') if empresa['FECHA_NACIMIENTO'] is not None else None
+            empresa['FECHA_ADICION'] = empresa['FECHA_ADICION'].strftime('%Y-%m-%d %H:%M:%S') if empresa[
+                                                                                                     'FECHA_ADICION'] is not None else None
+            empresa['FECHA_MODIFICACION'] = empresa['FECHA_MODIFICACION'].strftime('%Y-%m-%d %H:%M:%S') if empresa[
+                                                                                                               'FECHA_MODIFICACION'] is not None else None
+            empresa['FECHA_NACIMIENTO'] = empresa['FECHA_NACIMIENTO'].strftime('%Y-%m-%d') if empresa[
+                                                                                                  'FECHA_NACIMIENTO'] is not None else None
             empresa['ES_TALLER_AUTORIZADO'] = 'SI' if empresa['ES_TALLER_AUTORIZADO'] == 1 else 'NO'
-            empresa['TIPO_TALLER'] = 'AAA' if empresa['TIPO_TALLER'] == 3 else 'A' if empresa['TIPO_TALLER'] == 1 else 'AA' if empresa['TIPO_TALLER'] == 2 else 'SIN CLASIFICACION'
+            empresa['TIPO_TALLER'] = 'AAA' if empresa['TIPO_TALLER'] == 3 else 'A' if empresa[
+                                                                                          'TIPO_TALLER'] == 1 else 'AA' if \
+            empresa['TIPO_TALLER'] == 2 else 'SIN CLASIFICACION'
             empresas.append(empresa)
         return json.dumps(empresas)
     except Exception as ex:
         raise Exception(ex)
     return response_body
 
+
 @web_services.route("/atelier_by_code", methods=["GET"])
 def atelier_by_id():
-
     try:
         c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
         cur_01 = c.cursor()
@@ -59,20 +62,25 @@ def atelier_by_id():
         empresas = []
         for result in array:
             empresa = dict(zip(row_headers, result))
-            empresa['FECHA_ADICION'] = empresa['FECHA_ADICION'].strftime('%Y-%m-%d %H:%M:%S') if empresa['FECHA_ADICION'] is not None else None
-            empresa['FECHA_MODIFICACION'] = empresa['FECHA_MODIFICACION'].strftime('%Y-%m-%d %H:%M:%S') if empresa['FECHA_MODIFICACION'] is not None else None
-            empresa['FECHA_NACIMIENTO'] = empresa['FECHA_NACIMIENTO'].strftime('%Y-%m-%d') if empresa['FECHA_NACIMIENTO'] is not None else None
+            empresa['FECHA_ADICION'] = empresa['FECHA_ADICION'].strftime('%Y-%m-%d %H:%M:%S') if empresa[
+                                                                                                     'FECHA_ADICION'] is not None else None
+            empresa['FECHA_MODIFICACION'] = empresa['FECHA_MODIFICACION'].strftime('%Y-%m-%d %H:%M:%S') if empresa[
+                                                                                                               'FECHA_MODIFICACION'] is not None else None
+            empresa['FECHA_NACIMIENTO'] = empresa['FECHA_NACIMIENTO'].strftime('%Y-%m-%d') if empresa[
+                                                                                                  'FECHA_NACIMIENTO'] is not None else None
             empresa['ES_TALLER_AUTORIZADO'] = 'SI' if empresa['ES_TALLER_AUTORIZADO'] == 1 else 'NO'
-            empresa['TIPO_TALLER'] = 'SIN CLASIFICACION' if empresa['TIPO_TALLER'] == 0 else 'A' if empresa['TIPO_TALLER'] == 1 else 'AA' if empresa['TIPO_TALLER'] == 2 else 'AAA'
+            empresa['TIPO_TALLER'] = 'SIN CLASIFICACION' if empresa['TIPO_TALLER'] == 0 else 'A' if empresa[
+                                                                                                        'TIPO_TALLER'] == 1 else 'AA' if \
+            empresa['TIPO_TALLER'] == 2 else 'AAA'
             empresas.append(empresa)
         return json.dumps(empresas)
     except Exception as ex:
         raise Exception(ex)
     return response_body
 
+
 @web_services.route("/pedidos", methods=["GET"])
 def pedido_by_code():
-
     try:
         c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
         cur_01 = c.cursor()
@@ -101,9 +109,9 @@ def pedido_by_code():
         raise Exception(ex)
     return response_body
 
+
 @web_services.route("/pedidos_by_date", methods=["GET"])
 def pedido_by_date():
-
     try:
         c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
         cur_01 = c.cursor()
@@ -121,7 +129,7 @@ def pedido_by_date():
                     {"error": "Fecha Desde es mayor a Fecha hasta"}), 400
         except Exception as ex:
             return jsonify(
-                        {"error": "Formato de fechas incorrecto"}), 400
+                {"error": "Formato de fechas incorrecto"}), 400
 
         sql = """select *
                 from VT_PED_GUIAS_LAGANGA V
@@ -142,7 +150,8 @@ def pedido_by_date():
         raise Exception(ex)
     return response_body
 
-@web_services.route('/api-packing-list-by-code', methods = ['GET'])
+
+@web_services.route('/api-packing-list-by-code', methods=['GET'])
 def byCode():
     class create_dict(dict):
 
@@ -162,15 +171,20 @@ def byCode():
     user = info['username']
     password = info['password']
     array = oracle.execute_sql(
-        'select ROWNUM, P.COD_PRODUCTO, P.COD_MOTOR, P.COD_CHASIS, P.CAMVCPN, P.ANIO, P.COD_COLOR, P.CILINDRAJE, P.TONELAJE, P.OCUPANTES, P.MODELO, P.CLASE, P.SUBCLASE, P.FECHA_ADICION, P.FECHA_MODIFICACION, V.COD_LIQUIDACION, V.NOMBRE from ST_PROD_PACKING_LIST P, VT_VALORACION_SERIE V where p.empresa = 20 and p.cod_producto = v.COD_PRODUCTO(+) AND p.empresa = v.empresa(+) and p.cod_chasis = v.NUMERO_SERIE(+) and P.COD_CHASIS = '+ "'"+code+"'",user,password)
+        'select ROWNUM, P.COD_PRODUCTO, P.COD_MOTOR, P.COD_CHASIS, P.CAMVCPN, P.ANIO, P.COD_COLOR, P.CILINDRAJE, P.TONELAJE, P.OCUPANTES, P.MODELO, P.CLASE, P.SUBCLASE, P.FECHA_ADICION, P.FECHA_MODIFICACION, V.COD_LIQUIDACION, V.NOMBRE from ST_PROD_PACKING_LIST P, VT_VALORACION_SERIE V where p.empresa = 20 and p.cod_producto = v.COD_PRODUCTO(+) AND p.empresa = v.empresa(+) and p.cod_chasis = v.NUMERO_SERIE(+) and P.COD_CHASIS = ' + "'" + code + "'",
+        user, password)
     mydict = create_dict()
     for row in array:
-        mydict.add(row[0],({"CODPRODUC":row[1],"CODMOTOR":row[2],"CODCHASIS":row[3], "CPN":row[4], "YEAR":row[5],"COLOR":row[6],"CILINDRAJE":row[7],"TONELAJE":row[8], "OCUPANTES":row[9], "MODELO":row[10],"CLASE":row[11], "SUBCLASE":row[12], "FECHA CREACION":row[13], "FECHA MODIFICACION":row[14], "CODIGO LIQUIDACION":row[15], "IMPORTACION":row[16]}))
+        mydict.add(row[0], (
+        {"CODPRODUC": row[1], "CODMOTOR": row[2], "CODCHASIS": row[3], "CPN": row[4], "YEAR": row[5], "COLOR": row[6],
+         "CILINDRAJE": row[7], "TONELAJE": row[8], "OCUPANTES": row[9], "MODELO": row[10], "CLASE": row[11],
+         "SUBCLASE": row[12], "FECHA CREACION": row[13], "FECHA MODIFICACION": row[14], "CODIGO LIQUIDACION": row[15],
+         "IMPORTACION": row[16]}))
     stud_json = json.dumps(mydict, indent=2, default=str, ensure_ascii=False).encode('utf8')
     return stud_json
 
 
-@web_services.route('/api-packing-list', methods = ['GET'])
+@web_services.route('/api-packing-list', methods=['GET'])
 def byYear():
     class create_dict(dict):
 
@@ -192,26 +206,31 @@ def byYear():
     user = info['username']
     password = info['password']
     array = oracle.execute_sql(
-        'select ROWNUM, P.COD_PRODUCTO, P.COD_MOTOR, P.COD_CHASIS, P.CAMVCPN, P.ANIO, P.COD_COLOR, P.CILINDRAJE, P.TONELAJE, P.OCUPANTES, P.MODELO, P.CLASE, P.SUBCLASE, P.FECHA_ADICION, P.FECHA_MODIFICACION, V.COD_LIQUIDACION, V.NOMBRE from ST_PROD_PACKING_LIST P, VT_VALORACION_SERIE V where p.empresa = 20 and p.cod_producto = v.COD_PRODUCTO(+) AND p.empresa = v.empresa(+) and   p.cod_chasis = v.NUMERO_SERIE(+) and P.anio = '+year,user,password)
+        'select ROWNUM, P.COD_PRODUCTO, P.COD_MOTOR, P.COD_CHASIS, P.CAMVCPN, P.ANIO, P.COD_COLOR, P.CILINDRAJE, P.TONELAJE, P.OCUPANTES, P.MODELO, P.CLASE, P.SUBCLASE, P.FECHA_ADICION, P.FECHA_MODIFICACION, V.COD_LIQUIDACION, V.NOMBRE from ST_PROD_PACKING_LIST P, VT_VALORACION_SERIE V where p.empresa = 20 and p.cod_producto = v.COD_PRODUCTO(+) AND p.empresa = v.empresa(+) and   p.cod_chasis = v.NUMERO_SERIE(+) and P.anio = ' + year,
+        user, password)
     mydict = create_dict()
     for row in array:
-        mydict.add(row[0],({"CODPRODUC":row[1],"CODMOTOR":row[2],"CODCHASIS":row[3], "CPN":row[4], "YEAR":row[5],"COLOR":row[6],"CILINDRAJE":row[7],"TONELAJE":row[8], "OCUPANTES":row[9], "MODELO":row[10],"CLASE":row[11], "SUBCLASE":row[12], "FECHA CREACION":row[13], "FECHA MODIFICACION":row[14], "CODIGO LIQUIDACION":row[15], "IMPORTACION":row[16]}))
+        mydict.add(row[0], (
+        {"CODPRODUC": row[1], "CODMOTOR": row[2], "CODCHASIS": row[3], "CPN": row[4], "YEAR": row[5], "COLOR": row[6],
+         "CILINDRAJE": row[7], "TONELAJE": row[8], "OCUPANTES": row[9], "MODELO": row[10], "CLASE": row[11],
+         "SUBCLASE": row[12], "FECHA CREACION": row[13], "FECHA MODIFICACION": row[14], "CODIGO LIQUIDACION": row[15],
+         "IMPORTACION": row[16]}))
     stud_json = json.dumps(mydict, indent=2, default=str, ensure_ascii=False).encode('utf8')
     return stud_json
 
 
-#Api Product Img+Info
-@web_services.route('/imageByCode',  methods = ['GET'])
+# Api Product Img+Info
+@web_services.route('/imageByCode', methods=['GET'])
 def imageByCode():
     try:
-        #buscar imagen
-        c=oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
-        cur_01=c.cursor()
-        #Escribe la consulta
-        cod_code =request.args.get('code')
+        # buscar imagen
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur_01 = c.cursor()
+        # Escribe la consulta
+        cod_code = request.args.get('code')
         if cod_code is None:
             return jsonify({"error": "Se requiere el parámetro 'cod_material' en la solicitud."}), 400
-        sql_query   =   """
+        sql_query = """
             SELECT 
             P.COD_PRODUCTO,
             P.NOMBRE,
@@ -241,22 +260,22 @@ def imageByCode():
             T.EMPRESA = P.EMPRESA
 
 """
-        #ejecuta la consulta SQL
-        cursor=cur_01.execute(sql_query, {'cod_code':cod_code})
-        resultado=cursor.fetchone()
+        # ejecuta la consulta SQL
+        cursor = cur_01.execute(sql_query, {'cod_code': cod_code})
+        resultado = cursor.fetchone()
         if resultado:
-            code=resultado[0]
-            name=resultado[1]
-            iva=resultado[2]
-            ice=resultado[3]
-            marca=resultado[4]
-            buffer=resultado[5]
-            color=resultado[6]
-            category=resultado[7]
+            code = resultado[0]
+            name = resultado[1]
+            iva = resultado[2]
+            ice = resultado[3]
+            marca = resultado[4]
+            buffer = resultado[5]
+            color = resultado[6]
+            category = resultado[7]
             host = request.host
-            imageurl=f"http://{host}/imageApi/img?code={code}"
-            response_data={
-                "img":imageurl,
+            imageurl = f"http://{host}/imageApi/img?code={code}"
+            response_data = {
+                "img": imageurl,
                 "code": code,
                 "name": name,
                 "iva": iva,
@@ -273,21 +292,21 @@ def imageByCode():
 
 
     except Exception as ex:
-            print (ex)
-            return jsonify({"error":"Ocurrio un error al recuperar archivos"}), 500
+        print(ex)
+        return jsonify({"error": "Ocurrio un error al recuperar archivos"}), 500
 
 
-@web_services.route('/searchProduct',  methods = ['GET'])
+@web_services.route('/searchProduct', methods=['GET'])
 def searchProduct():
     try:
-        #buscar imagen
+        # buscar imagen
         page = int(request.args.get('page'))
         items_per_page = 50
         offset = (page - 1) * items_per_page
         c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
         cur_01 = c.cursor()
-        #Escribe la consulta
-        sql_query   =   """
+        # Escribe la consulta
+        sql_query = """
  SELECT
             P.COD_PRODUCTO,
             P.NOMBRE,
@@ -344,7 +363,7 @@ def searchProduct():
             and       b.bodega                      = l.cod_agencia
 
 """
-        #ejecuta la consulta SQL
+        # ejecuta la consulta SQL
         cursor = cur_01.execute(sql_query)
         resultados = cursor.fetchall()
         paginated_results = resultados[offset:offset + items_per_page]
@@ -363,9 +382,9 @@ def searchProduct():
                 cod_agencia = resultado[8]
                 bodega = resultado[9]
                 nombre = resultado[10]
-                motoCategory=resultado[11]
-                motoModel=resultado[12]
-                cod_unidad=resultado[13]
+                motoCategory = resultado[11]
+                motoModel = resultado[12]
+                cod_unidad = resultado[13]
                 precio = resultado[14]
                 stock = resultado[15]
                 host = '200.105.245.182:5000'
@@ -399,8 +418,9 @@ def searchProduct():
 
 
     except Exception as ex:
-            print (ex)
-            return jsonify({"error":"Ocurrio un error al recuperar archivos"}), 500
+        print(ex)
+        return jsonify({"error": "Ocurrio un error al recuperar archivos"}), 500
+
 
 @web_services.route('/sri_motos_matriculas', methods=['POST'])
 def cargaMatriculas():
@@ -409,8 +429,8 @@ def cargaMatriculas():
         print(data)
         anio = data.get('anio')
         page_size = 100
-        page_number = data.get('page',1)
-        offset = (page_number-1)*page_size
+        page_number = data.get('page', 1)
+        offset = (page_number - 1) * page_size
         print(anio)
         # Modifica tu consulta SQL para incluir LIMIT y OFFSET
         # Obtener la conexión y el cursor
@@ -524,5 +544,79 @@ def saveMatriculas():
         return jsonify({'error': str(e)}), 500
 
 
+# WS MODULE WARRANTY
+@web_services.route('/warranty/motorcycles', methods=['POST'])
+def warranty():
+    try:
+        # PRE INSERT (Generación de Codigo comprobante )
+        v_cod_empresa = 20
+        v_cod_tipo_comprobante = 'CP'
+        v_cod_agencia = 1
+        # Llamada al procedimiento almacenado en DB
+        query = """
+                DECLARE
+                  v_cod_empresa           FLOAT := :1;
+                  v_cod_tipo_comprobante  VARCHAR2(50) := :2;
+                  v_cod_agencia           FLOAT := :3;
+                  v_result                VARCHAR2(50);
+                BEGIN
+                  v_result := KC_ORDEN.asigna_cod_comprobante(p_cod_empresa => v_cod_empresa,
+                                                              p_cod_tipo_comprobante => v_cod_tipo_comprobante,
+                                                              p_cod_agencia => v_cod_agencia);
+                :4 := v_result;
+                END;
+                """
+        # Ejecutar la consulta de inserción
+        # Obtén la conexión y el cursor
+
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur = c.cursor()
+
+        # Variable de salida para capturar el resultado
+        result_var = cur.var(cx_Oracle.STRING)
+
+        # Ejecuta el procedimiento almacenado
+        cur.execute(query, (v_cod_empresa, v_cod_tipo_comprobante, v_cod_agencia, result_var))
+        # Captura el resultado
+        result = result_var.getvalue()
+        # Confirmar la transacción y cerrar el cursor y la conexión
+        c.commit()
+        cur.close()
+        c.close()
+
+        # INFO TALLER
+        ruc = '0106320500001'
+        if not ruc:
+            return jsonify({"error": "Se requiere el campo 'ruc' en la solicitud"}), 400
+        query = """
+                        SELECT COD_PROVINCIA, COD_CANTON
+                        FROM AR_TALLER_SERVICIO_TECNICO
+                        WHERE ruc = :1
+                        """
+        # Ejecutar la consulta de inserción
+        # Obtén la conexión y el cursor
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur = c.cursor()
+        cur.execute(query, (ruc,))
+        # Obtener los resultados
+        city = cur.fetchall()
+        # Cerrar el cursor y la conexión
+        cur.close()
+        c.close()
+
+        #INFO MOTOR
+        numMotor=' LC162FMJLE050582'
+        if not numMotor:
+            return jsonify({"error": "Se requiere el campo 'numMotor'"})
+
+        data = oracle.infoMotor(numMotor)
+        print(data)
+        # Obtén la conexión y el cursor
 
 
+
+        return jsonify({'result': result, 'code Province, Ciudad': city, "motorDAta": data})
+
+    except Exception as e:
+        print(e)
+        return jsonify({'error': str(e)}), 500
