@@ -448,10 +448,19 @@ def saveMatriculas():
                 continue
 
             # Formatear las fechas desde los datos JSON
-            fecha_ultima_matricula = datetime.strptime(record["FECHA ULTIMA MATRICULA"], '%d/%m/%Y')
-            fecha_de_compra = datetime.strptime(record[" FECHA DE COMPRA"], '%d/%m/%Y')
-            fecha_caducidad_matricula = datetime.strptime(record["FECHA CADUCIDAD MATRICULA"], '%d/%m/%Y')
-            fecha_de_revision = datetime.strptime(record[" FECHA DE REVISION"], '%d/%m/%Y')
+            #fecha_ultima_matricula = datetime.strptime(record["FECHA ULTIMA MATRICULA"], '%d/%m/%Y')
+            #fecha_de_compra = datetime.strptime(record[" FECHA DE COMPRA"], '%d/%m/%Y')
+            #fecha_caducidad_matricula = datetime.strptime(record["FECHA CADUCIDAD MATRICULA"], '%d/%m/%Y')
+            #fecha_de_revision = datetime.strptime(record[" FECHA DE REVISION"], '%d/%m/%Y')
+
+            # Formatear las fechas desde los datos JSON
+            fecha_ultima_matricula = None
+            fecha_de_compra = None
+            fecha_caducidad_matricula = None
+            fecha_de_revision = None
+
+
+
             # Verificar si el registro ya existe
             select_query = "SELECT COUNT(*) FROM ST_MATRICULACION_MOTOS WHERE PLACA = :1"
             cur_01.execute(select_query, (record["PLACA"],))
@@ -479,34 +488,34 @@ def saveMatriculas():
             values = (
                 20,  # Replace with the correct value for EMPRESA
                 record["NOMBRE"],
-                record["TIPO IDENTIFICACION"],
-                record["IDENTIFICACION"],
-                record["DIRECCION"],
-                record["TELEFONO"],
-                record["PLACA"],
-                record[" CAMV O CPN"],
-                record["MARCA"],
-                record[" MODELO"],
-                record["PAIS"],
-                record[" ANO"],
-                record["CILINDRAJE"],
-                record["CLASE"],
-                record[" SERVICIO"],
-                fecha_ultima_matricula,
-                fecha_de_compra,
-                fecha_caducidad_matricula,
-                record[" ANO ULTIMO PAGO"],
-                record["CANTON"],
-                record[" ENTIDAD POLICIAL"],
-                record["ESTADO MATRICULADO"],
-                record[" ESTADO EXONERACION"],
-                record["COLOR 1"],
-                record[" PROHIBICION DE ENAJENAR"],
-                record["COLOR 2"],
-                fecha_de_revision,
-                record["TIPO DE USO DEL VEHICULO"],
-                record["ESTADO"],
-                record[" OBSERVACION"]
+                record["TIPO IDENTIFICACION"] if "TIPO IDENTIFICACION" in record else None,
+                record["IDENTIFICACION"] if "IDENTIFICACION" in record else None,
+                record["DIRECCION"] if "DIRECCION" in record else None,
+                record["TELEFONO"] if "TELEFONO" in record else None,
+                record["PLACA"] if "PLACA" in record else None,
+                record[" CAMV O CPN"] if " CAMV O CPN" in record else None,
+                record["MARCA"] if "MARCA" in record else None,
+                record[" MODELO"] if " MODELO" in record else None,
+                record["PAIS"] if "PAIS" in record else None,
+                record[" ANO"] if " ANO" in record else None,
+                record["CILINDRAJE"] if "CILINDRAJE" in record else None,
+                record["CLASE"] if "CLASE" in record else None,
+                record[" SERVICIO"] if " SERVICIO" in record else None,
+                fecha_ultima_matricula if fecha_ultima_matricula else None,
+                fecha_de_compra if fecha_de_compra else None,
+                fecha_caducidad_matricula if fecha_caducidad_matricula else None,
+                record[" ANO ULTIMO PAGO"] if " ANO ULTIMO PAGO" in record else None,
+                record["CANTON"] if "CANTON" in record else None,
+                record[" ENTIDAD POLICIAL"] if " ENTIDAD POLICIAL" in record else None,
+                record["ESTADO MATRICULADO"] if "ESTADO MATRICULADO" in record else None,
+                record[" ESTADO EXONERACION"] if " ESTADO EXONERACION" in record else None,
+                record["COLOR 1"] if "COLOR 1" in record else None,
+                record[" PROHIBICION DE ENAJENAR"] if " PROHIBICION DE ENAJENAR" in record else None,
+                record["COLOR 2"] if "COLOR 2" in record else None,
+                fecha_de_revision if fecha_de_revision else None,
+                record["TIPO DE USO DEL VEHICULO"] if "TIPO DE USO DEL VEHICULO" in record else None,
+                record["ESTADO"] if "ESTADO" in record else None,
+                record[" OBSERVACION"] if " OBSERVACION" in record else None
             )
 
             # Ejecutar la consulta de inserción
