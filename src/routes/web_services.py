@@ -546,77 +546,139 @@ def saveMatriculas():
 
 # WS MODULE WARRANTY
 @web_services.route('/warranty/motorcycles', methods=['POST'])
+
 def warranty():
     try:
-        # PRE INSERT (Generación de Codigo comprobante )
-        v_cod_empresa = 20
-        v_cod_tipo_comprobante = 'CP'
-        v_cod_agencia = 1
-        # Llamada al procedimiento almacenado en DB
-        query = """
-                DECLARE
-                  v_cod_empresa           FLOAT := :1;
-                  v_cod_tipo_comprobante  VARCHAR2(50) := :2;
-                  v_cod_agencia           FLOAT := :3;
-                  v_result                VARCHAR2(50);
-                BEGIN
-                  v_result := KC_ORDEN.asigna_cod_comprobante(p_cod_empresa => v_cod_empresa,
-                                                              p_cod_tipo_comprobante => v_cod_tipo_comprobante,
-                                                              p_cod_agencia => v_cod_agencia);
-                :4 := v_result;
-                END;
-                """
-        # Ejecutar la consulta de inserción
-        # Obtén la conexión y el cursor
+        # Capturar datos del request
+        dataCaso = request.json
 
-        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
-        cur = c.cursor()
+        for clave, valor in dataCaso.items():
+            try:
+                # Intenta convertir a mayúsculas, pero si es un entero, captura la excepción
+                dataCaso[clave] = str(valor).upper()
+            except AttributeError:
+                # Maneja la excepción si el valor no se puede convertir a mayúsculas
+                print(f"Error: La clave '{clave}' tiene un valor que no se puede convertir a mayúsculas.")
 
-        # Variable de salida para capturar el resultado
-        result_var = cur.var(cx_Oracle.STRING)
+        # Configuración de datos no variables
+        set_non_variable_data(dataCaso)
 
-        # Ejecuta el procedimiento almacenado
-        cur.execute(query, (v_cod_empresa, v_cod_tipo_comprobante, v_cod_agencia, result_var))
-        # Captura el resultado
-        result = result_var.getvalue()
-        # Confirmar la transacción y cerrar el cursor y la conexión
-        c.commit()
-        cur.close()
-        c.close()
+        # Obtener información del taller
+        get_taller_info(dataCaso)
 
-        # INFO TALLER
-        ruc = '0106320500001'
-        if not ruc:
-            return jsonify({"error": "Se requiere el campo 'ruc' en la solicitud"}), 400
-        query = """
-                        SELECT COD_PROVINCIA, COD_CANTON
-                        FROM AR_TALLER_SERVICIO_TECNICO
-                        WHERE ruc = :1
-                        """
-        # Ejecutar la consulta de inserción
-        # Obtén la conexión y el cursor
-        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
-        cur = c.cursor()
-        cur.execute(query, (ruc,))
-        # Obtener los resultados
-        city = cur.fetchall()
-        # Cerrar el cursor y la conexión
-        cur.close()
-        c.close()
+        # Obtener información del motor
+        get_motor_info(dataCaso)
 
-        #INFO MOTOR
-        numMotor=' LC162FMJLE050582'
-        if not numMotor:
-            return jsonify({"error": "Se requiere el campo 'numMotor'"})
+        # Generación de Codigo comprobante y guardar Entrada en st_casos_postventa
+        generate_comprobante_code(dataCaso)
 
-        data = oracle.infoMotor(numMotor)
-        print(data)
-        # Obtén la conexión y el cursor
+        print(dataCaso)
 
-
-
-        return jsonify({'result': result, 'code Province, Ciudad': city, "motorDAta": data})
+        return jsonify({"motorData": dataCaso})
 
     except Exception as e:
         print(e)
         return jsonify({'error': str(e)}), 500
+
+def set_non_variable_data(data):
+    data['empresa'] = 20
+    data['tipo_comprobante'] = 'CP'
+    fecha_formateada = datetime.strptime(data['fecha'], '%d/%m/%Y %H:%M:%S')
+    data['fecha'] = fecha_formateada
+    data['codigo_nacion'] = 1
+    data['codigo_responsable'] = 'WSSHIBOT'
+    data['cod_canal'] = 5
+    data['adicionado_por'] = 'WSSHIBOT'
+    fecha_venta = datetime.strptime(data['fecha_venta'], '%Y/%m')
+    data['fecha_venta'] = fecha_venta
+    print(data['fecha'])
+    #datetime.strptime(record["FECHA ULTIMA MATRICULA"], '%d/%m/%Y')
+
+def generate_comprobante_code(data):
+    v_cod_empresa = 20
+    v_cod_tipo_comprobante = 'CP'
+    v_cod_agencia = 1
+
+    query = """
+                    DECLARE
+                      v_cod_empresa           FLOAT := :1;
+                      v_cod_tipo_comprobante  VARCHAR2(50) := :2;
+                      v_cod_agencia           FLOAT := :3;
+                      v_result                VARCHAR2(50);
+                    BEGIN
+                      v_result := KC_ORDEN.asigna_cod_comprobante(p_cod_empresa => v_cod_empresa,
+                                                                  p_cod_tipo_comprobante => v_cod_tipo_comprobante,
+                                                                  p_cod_agencia => v_cod_agencia);
+                    :4 := v_result;
+                    END;
+                    """
+
+    # Obtener la conexión y el cursor
+    c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+    cur = c.cursor()
+
+    # Variable de salida para capturar el resultado
+    result_var = cur.var(cx_Oracle.STRING)
+
+    # Ejecutar la consulta
+    cur.execute(query, (v_cod_empresa, v_cod_tipo_comprobante, v_cod_agencia, result_var))
+    result = result_var.getvalue()
+    data['cod_comprobante'] = result
+    # Insercion en la tabla, confirmar la transacción y cerrar el cursor y la conexión
+    sql = """
+    INSERT INTO ST_CASOS_POSTVENTA (
+        nombre_caso, descripcion, nombre_cliente, cod_tipo_identificacion, identificacion_cliente,
+        cod_motor, kilometraje, codigo_taller, cod_tipo_problema, fecha_venta, manual_garantia,
+        telefono_contacto1, telefono_contacto2, e_mail1, empresa, tipo_comprobante, fecha,
+        codigo_nacion, codigo_responsable, cod_canal, adicionado_por, codigo_provincia,
+        codigo_canton, cod_producto, cod_distribuidor_cli, cod_comprobante
+    ) VALUES (
+        :nombre_caso, :descripcion, :nombre_cliente, :cod_tipo_identificacion, :identificacion_cliente,
+        :cod_motor, :kilometraje, :codigo_taller, :cod_tipo_problema, :fecha_venta, :manual_garantia,
+        :telefono_contacto1, :telefono_contacto2, :e_mail, :empresa, :tipo_comprobante, :fecha,
+        :codigo_nacion, :codigo_responsable, :cod_canal, :adicionado_por, :codigo_provincia,
+        :codigo_canton, :cod_producto, :cod_distribuidor_cli, :cod_comprobante
+    )
+    """
+    cur.execute(sql, data)
+    c.commit()
+    cur.close()
+    c.close()
+
+
+def get_taller_info(data):
+    id_taller = data['codigo_taller']
+
+    if not id_taller:
+        return jsonify({"error": "Se requiere el campo 'codigo_taller' en la solicitud"}), 400
+
+    query = """
+                    SELECT COD_PROVINCIA, COD_CANTON
+                    FROM AR_TALLER_SERVICIO_TECNICO
+                    WHERE CODIGO = :1
+                    """
+
+    # Obtener la conexión y el cursor
+    c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+    cur = c.cursor()
+
+    # Ejecutar la consulta
+    cur.execute(query, (id_taller,))
+    city = cur.fetchall()
+
+    # Cerrar el cursor y la conexión
+    data['codigo_provincia'] = city[0][0]
+    data['codigo_canton'] = city[0][1]
+    cur.close()
+    c.close()
+
+
+def get_motor_info(data):
+    num_motor = data['cod_motor']
+
+    if not num_motor:
+        return jsonify({"error": "Se requiere el campo 'cod_motor'"})
+
+    data_motor = oracle.infoMotor(num_motor)
+    data['cod_producto'] = data_motor[1]
+    data['cod_distribuidor_cli'] = data_motor[0]
