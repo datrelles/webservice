@@ -5,14 +5,17 @@ import datetime as dt
 
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 
-
+#from flask_wtf.csrf import CSRFProtect
+from numpy.core.defchararray import upper
+from requests.auth import HTTPBasicAuth
 #from flask_wtf.csrf import CSRFProtect
 
 from numpy.core.defchararray import upper
-
 from src import oracle
 from src.routes.web_services import web_services
 from src.routes.auth import auth
+from dotenv import load_dotenv, find_dotenv
+from src.models.ModelUser import ModelUser
 from src.routes.image_service import image_service
 from dotenv import load_dotenv, find_dotenv
 from src.models.entities.User import User
@@ -62,6 +65,7 @@ login_manager = LoginManager(app)
 app.register_blueprint(auth, url_prefix="/")
 app.register_blueprint(web_services, url_prefix="/api")
 app.register_blueprint(image_service,   url_prefix="/imageApi/")
+
 
 @app.route('/token', methods=["POST"])
 @cross_origin()

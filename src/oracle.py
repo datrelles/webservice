@@ -59,7 +59,6 @@ def execute_sql(SQL,user,password):
         print('Sentencia SQL ejecutada correctamente!')
     conexion.close()
     return correct
-
 #----------------FUNCTIONS MODULE GARANTIAS-----------------------------
 def infoMotor(motor):
     #Configura conexion
