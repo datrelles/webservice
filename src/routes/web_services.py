@@ -691,3 +691,20 @@ def get_motor_info(data):
     data_motor = oracle.infoMotor(num_motor)
     data['cod_producto'] = data_motor[1]
     data['cod_distribuidor_cli'] = data_motor[0]
+
+@web_services.route('/get/cod_tipo_problema', methods=['GET'])
+def get_cod_tipo_problema():
+
+    query = """SELECT DESCRIPCION TIPO_PROBLEMA, to_char(CODIGO_DURACION) CODIGO
+                FROM AR_DURACION_REPARACION
+                WHERE TIPO_DURACION='N'
+                AND CODIGO_EMPRESA= :1"""
+
+    c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+    cur_01 = c.cursor()
+    result = cur_01.execute(query, (20,)).fetchall()
+    dictionary = dict(result)
+    cur_01.close()
+    c.close()
+    return jsonify(dictionary)
+
