@@ -4,17 +4,20 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import datetime as dt
 
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+
 #from flask_wtf.csrf import CSRFProtect
 from numpy.core.defchararray import upper
 from requests.auth import HTTPBasicAuth
+#from flask_wtf.csrf import CSRFProtect
 
-
-
+from numpy.core.defchararray import upper
 from src import oracle
 from src.routes.web_services import web_services
 from src.routes.auth import auth
 from dotenv import load_dotenv, find_dotenv
 from src.models.ModelUser import ModelUser
+from src.routes.image_service import image_service
+from dotenv import load_dotenv, find_dotenv
 from src.models.entities.User import User
 from flask_login import LoginManager, login_user,logout_user, login_required
 from os import getenv
@@ -61,6 +64,7 @@ login_manager = LoginManager(app)
 
 app.register_blueprint(auth, url_prefix="/")
 app.register_blueprint(web_services, url_prefix="/api")
+app.register_blueprint(image_service,   url_prefix="/imageApi/")
 
 
 @app.route('/token', methods=["POST"])
@@ -533,6 +537,107 @@ def consume_api_garantias_auto():
             print("Error inserting row ", name, " ", fecha_crea, " :",error)
     c.close()
     return jsonify({'msg': 'Test'})
+
+#PRUEBAS CRONTASKS JELOU
+@app.route("/pruebaEncuestas", methods=['GET'])
+def consume_api_encuestas_talleres():
+
+    today = dt.date.today()
+    yesterday = today - dt.timedelta(days=1)
+    yesterday = yesterday.strftime("%Y-%m-%d")
+    response = requests.get("https://api.jelou.ai/v1/company/405/reports/172/rows?startAt="+yesterday+"T00:00:01.007-05:00&endAt="+yesterday+"T23:59:59.007-05:00&limit=500&page=1",
+                            auth=HTTPBasicAuth(getenv("API_USER"),getenv("API_PASS")))
+    data = response.json()
+    print(data)
+    # rows = data['rows']
+    # c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+    # cursor = c.cursor()
+
+    # for row in rows:
+    #     name = row["name"]
+    #     phone = row["phone"]
+    #     placa = row["placa"]
+    #     taller_mecanico = row.get("tallerMecanico", " ")
+    #     resumen_dano = row.get("resumenDaño", None)
+    #     fecha_crea = row["createdAt"]
+    #     fecha_mod = row["updatedAt"]
+    #     empresa = '20'
+    #
+    #     query = "INSERT INTO STOCK.ST_WS_DANIOS (name, phone, placa, taller_mecanico, resumen_dano, fecha_crea, fecha_mod, empresa) VALUES (:name, :phone, :placa, :taller_mecanico, :resumen_dano, TO_DATE(:fecha_crea, 'DD/MM/YYYY HH24:MI'), TO_DATE(:fecha_mod, 'DD/MM/YYYY HH24:MI'), :empresa)"
+    #
+    #     try:
+    #         cursor.execute(query, {
+    #         "name": name.upper(),
+    #         "phone": phone,
+    #         "placa": placa.upper(),
+    #         "taller_mecanico": taller_mecanico.upper(),
+    #         "resumen_dano": resumen_dano.upper(),
+    #         "fecha_crea": fecha_crea,
+    #         "fecha_mod": fecha_mod,
+    #         "empresa": empresa,
+    #     })
+    #         c.commit()
+    #
+    #     except c.Error as error:
+    #         print("Error inserting row ", name, " ", fecha_crea, " :",error)
+    # c.close()
+    return jsonify({'msg': 'Test'})
+
+@app.route("/pruebaEncuestas1", methods=['GET'])
+def consume_api_Proteccion_datos():
+    today = dt.date.today()
+    yesterday = today - dt.timedelta(days=1)
+    yesterday = yesterday.strftime("%Y-%m-%d")
+    response = requests.get("https://api.jelou.ai/v1/company/405/reports/227/rows?startAt=2023-11-02T00:00:01.007-05:00&endAt=2023-11-06T23:59:59.007-05:00&limit=500&page=1",
+                            auth=HTTPBasicAuth(getenv("API_USER"),getenv("API_PASS")))
+    data = response.json()
+    rows = data['rows']
+    c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+    cursor = c.cursor()
+    for row in rows:
+          channel = row["channel"]
+          botId = row["botId"]
+          userId = row["userId"]
+          creationDate = row.get("creationDate")
+          modificationDate = row.get("modificationDate")
+          accepted = row.get("accepted")
+          legalId = row.get("legalId", 0)
+          mail=row.get("mail", "")
+          created_At= row["_createdAt"]
+          updated_At = row["_updatedAt"]
+          createdAt=row["createdAt"]
+          updatedAt=row["updatedAt"]
+          empresa = '20'
+
+          # Imprimir los valores después de cada iteración
+
+
+          query = """INSERT INTO STOCK.ST_WS_PROTECCION_DATOS 
+                    (CHANNEL, BOT_ID, USER_ID, CREATION_DATE, MODIFICATION_DATE, ACCEPTED, LEGAL_ID, MAIL, CREATED_AT, UPDATED_AT, CREATEDAT, UPDATEDAT, EMPRESA)
+                     VALUES  (:channel, :botId, :userId, TO_DATE(:creationDate, 'DD/MM/YYYY HH24:MI'), TO_DATE(:modificationDate, 'DD/MM/YYYY HH24:MI'), :accepted, :legalId, :mail, TO_DATE(:created_At, 'DD/MM/YYYY HH24:MI'), TO_DATE(:updated_At, 'DD/MM/YYYY HH24:MI'), TO_DATE(:createdAt, 'DD/MM/YYYY HH24:MI'), TO_DATE(:updatedAt, 'DD/MM/YYYY HH24:MI'), :empresa)"""
+
+          try:
+            cursor.execute(query, {
+                "channel": channel,
+                "botId": botId,
+                "userId": int(userId),
+                "creationDate": datetime.strptime(creationDate,"%Y-%m-%dT%H:%M:%S.%fZ"),
+                "modificationDate": modificationDate,
+                "accepted": accepted,
+                "legalId": legalId,
+                "mail": mail,
+                "created_At": datetime.strptime(created_At,"%Y-%m-%dT%H:%M:%S.%fZ"),
+                "updated_At": updated_At,
+                "createdAt": createdAt,
+                "updatedAt": updatedAt,
+                "empresa": empresa
+        })
+            c.commit()
+          except c.Error as error:
+            print("Error inserting row ", userId, " ", creationDate, " :",error)
+    c.close()
+    return jsonify({'msg': 'Test'})
+
 
 
 ############################################################
