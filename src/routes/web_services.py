@@ -540,11 +540,13 @@ def saveMatriculas():
 
 # WS MODULE WARRANTY
 @web_services.route('/warranty/motorcycles', methods=['POST'])
-
 def warranty():
     try:
         # Capturar datos del request
-        dataCaso = request.json
+        dataCaso = json.loads(request.data)
+        validacion_exitosa, mensaje_error = validar_campos(dataCaso)
+        if not validacion_exitosa:
+            return jsonify({"error": mensaje_error}), 400
 
         for clave, valor in dataCaso.items():
             try:
@@ -553,27 +555,45 @@ def warranty():
             except AttributeError:
                 # Maneja la excepción si el valor no se puede convertir a mayúsculas
                 print(f"Error: La clave '{clave}' tiene un valor que no se puede convertir a mayúsculas.")
-
         # Configuración de datos no variables
         set_non_variable_data(dataCaso)
-
         # Obtener información del taller
         get_taller_info(dataCaso)
-
         # Obtener información del motor
         get_motor_info(dataCaso)
-
         # Generación de Codigo comprobante y guardar Entrada en st_casos_postventa
-        generate_comprobante_code(dataCaso)
+        data_st_casos_post_venta=dataCaso.copy()
+        del data_st_casos_post_venta["problemas"]
+        del data_st_casos_post_venta["evidencias"]
+        generate_comprobante_code(data_st_casos_post_venta, dataCaso)
+        # Guardar tipo Problema
+        save_cod_tipo_problema(dataCaso)
+        #Guardar evidencias
+        save_url_st_casos_postVenta(dataCaso)
 
-        print(dataCaso)
-
-        return jsonify({"motorData": dataCaso})
+        return jsonify({"casoData": dataCaso})
 
     except Exception as e:
         print(e)
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'Error en el registro del caso': str(e)}), 500
 
+def validar_campos(data):
+    campos_necesarios = [
+        "nombre_caso",
+        "descripcion",
+        "nombre_cliente",
+        "cod_tipo_identificacion",
+        "identificacion_cliente",
+        "cod_motor",
+        "kilometraje",
+        "codigo_taller",
+        "cod_tipo_problema"
+    ]
+    for campo in campos_necesarios:
+        if campo not in data:
+            return False, f"Falta el campo {campo} en el JSON recibido."
+
+    return True, None
 def set_non_variable_data(data):
     data['empresa'] = 20
     data['tipo_comprobante'] = 'CP'
@@ -585,10 +605,9 @@ def set_non_variable_data(data):
     data['adicionado_por'] = 'WSSHIBOT'
     fecha_venta = datetime.strptime(data['fecha_venta'], '%Y/%m')
     data['fecha_venta'] = fecha_venta
-    print(data['fecha'])
+    data['aplica_garantia'] = 2
     #datetime.strptime(record["FECHA ULTIMA MATRICULA"], '%d/%m/%Y')
-
-def generate_comprobante_code(data):
+def generate_comprobante_code(data, dataCaso):
     v_cod_empresa = 20
     v_cod_tipo_comprobante = 'CP'
     v_cod_agencia = 1
@@ -617,6 +636,7 @@ def generate_comprobante_code(data):
     # Ejecutar la consulta
     cur.execute(query, (v_cod_empresa, v_cod_tipo_comprobante, v_cod_agencia, result_var))
     result = result_var.getvalue()
+    dataCaso['cod_comprobante'] = result
     data['cod_comprobante'] = result
     # Insercion en la tabla, confirmar la transacción y cerrar el cursor y la conexión
     sql = """
@@ -625,21 +645,21 @@ def generate_comprobante_code(data):
         cod_motor, kilometraje, codigo_taller, cod_tipo_problema, fecha_venta, manual_garantia,
         telefono_contacto1, telefono_contacto2, e_mail1, empresa, tipo_comprobante, fecha,
         codigo_nacion, codigo_responsable, cod_canal, adicionado_por, codigo_provincia,
-        codigo_canton, cod_producto, cod_distribuidor_cli, cod_comprobante
+        codigo_canton, cod_producto, cod_distribuidor_cli, cod_comprobante, aplica_garantia
     ) VALUES (
         :nombre_caso, :descripcion, :nombre_cliente, :cod_tipo_identificacion, :identificacion_cliente,
         :cod_motor, :kilometraje, :codigo_taller, :cod_tipo_problema, :fecha_venta, :manual_garantia,
         :telefono_contacto1, :telefono_contacto2, :e_mail, :empresa, :tipo_comprobante, :fecha,
         :codigo_nacion, :codigo_responsable, :cod_canal, :adicionado_por, :codigo_provincia,
-        :codigo_canton, :cod_producto, :cod_distribuidor_cli, :cod_comprobante
+        :codigo_canton, :cod_producto, :cod_distribuidor_cli, :cod_comprobante, :aplica_garantia
     )
     """
+
+
     cur.execute(sql, data)
     c.commit()
     cur.close()
     c.close()
-
-
 def get_taller_info(data):
     id_taller = data['codigo_taller']
 
@@ -665,8 +685,6 @@ def get_taller_info(data):
     data['codigo_canton'] = city[0][1]
     cur.close()
     c.close()
-
-
 def get_motor_info(data):
     num_motor = data['cod_motor']
 
@@ -676,10 +694,81 @@ def get_motor_info(data):
     data_motor = oracle.infoMotor(num_motor)
     data['cod_producto'] = data_motor[1]
     data['cod_distribuidor_cli'] = data_motor[0]
+def save_cod_tipo_problema(data):
+    c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+    cur = c.cursor()
+    sql = """
+             INSERT INTO ST_CASOS_TIPO_PROBLEMA
+             (empresa, tipo_comprobante, cod_comprobante, codigo_duracion, adicionado_por, descripcion )
+             VALUES
+             (:empresa, :tipo_comprobante, :cod_comprobante, :codigo_duracion, :adicionado_por, :descripcion)          
+          """
+    problemas = data.get("problemas",[])
+    problemas = problemas.replace("'", '"')
+    problemas = json.loads(problemas)
+    #Datos predefinidos
+    empresa = 20
+    cod_comprobante = data["cod_comprobante"]
+    tipo_comprobante = data["tipo_comprobante"]
+    adicionado_por = 'SHIBOT'
+
+    # Iterar sobre los datos y ejecutar la insercion
+    for problema in problemas:
+        data = {
+            'empresa': empresa,
+            'tipo_comprobante': tipo_comprobante,
+            'cod_comprobante': cod_comprobante,
+            'codigo_duracion': problema["CODIGO_TIPO_PROBLEMA"],
+            'adicionado_por': adicionado_por,
+            'descripcion': problema["DESCRIPCION_DEL_PROBLEMA"],
+        }
+        cur.execute(sql, data)
+    c.commit()
+    cur.close()
+    c.close()
+def save_url_st_casos_postVenta(data):
+    c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+    cur = c.cursor()
+    cur.execute("SELECT COUNT(*) FROM ST_CASOS_URL")
+    # Obtener el número total de registros
+    total_registros = cur.fetchone()[0]
+    siguiente_secuencial = total_registros + 1
+
+
+    sql = """
+             INSERT INTO ST_CASOS_URL
+             (empresa, tipo_comprobante, cod_comprobante,secuencial, url_photos, url_videos, adicionado_por )
+             VALUES
+             (:empresa, :tipo_comprobante, :cod_comprobante,:secuencial, :url_photos, :url_videos, :adicionado_por)          
+          """
+    url = data.get("evidencias", {})
+    url = url.replace("'", '"')
+    url = json.loads(url)
+    print(url)
+    print(type(url))
+
+    #Datos predefinidos
+    empresa = 20
+    cod_comprobante = data["cod_comprobante"]
+    tipo_comprobante = data["tipo_comprobante"]
+    adicionado_por = 'SHIBOT'
+
+    data = {
+        'empresa': empresa,
+        'tipo_comprobante': tipo_comprobante,
+        'cod_comprobante': cod_comprobante,
+        'secuencial': siguiente_secuencial,
+        'url_photos': ', '.join(url["URL_IMAGENES"]),
+        'url_videos': ', '.join(url["URL_VIDEOS"]),
+        'adicionado_por': adicionado_por,
+    }
+    cur.execute(sql, data)
+    c.commit()
+    cur.close()
+    c.close()
 
 @web_services.route('/get/cod_tipo_problema', methods=['GET'])
 def get_cod_tipo_problema():
-
     query = """SELECT DESCRIPCION TIPO_PROBLEMA, to_char(CODIGO_DURACION) CODIGO
                 FROM AR_DURACION_REPARACION
                 WHERE TIPO_DURACION='N'
@@ -692,4 +781,78 @@ def get_cod_tipo_problema():
     cur_01.close()
     c.close()
     return jsonify(dictionary)
+@web_services.route('/status_warranty/<code_comprobante>', methods=['GET'])
+def get_status_warranty(code_comprobante):
+    try:
+        "SELECT ESTADO, CODIGO_DURACION, DESCRIPCION FROM ST_CASOS_TIPO_PROBLEMA"
+
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur = c.cursor()
+        sql = """
+            SELECT ESTADO, CODIGO_DURACION, DESCRIPCION from ST_CASOS_TIPO_PROBLEMA where 
+            EMPRESA = 20 AND
+            TIPO_COMPROBANTE = 'CP' AND
+            cod_comprobante = :code_comprobante
+        """
+        result = cur.execute(sql, {'code_comprobante': code_comprobante}).fetchall()
+        if not result:  # Si result está vacío
+            return jsonify({
+                'mensaje': 'NO SE ENCONTRARON REGISTROS PARA ESE CODIGO'
+            }), 404  # Devuelve un código 404 Not Found para indicar que no se encontraron registros
+
+        dataDic = []
+        #Iterara sobre la lista
+        for item in result:
+            estado, cod_tipo_problema, descripcion = item
+            # Crear el diccionario con los datos correspondientes
+            dictionary = {
+                'Estado': estado,
+                'cod_tipo_problema': cod_tipo_problema,
+                'descripcion': descripcion
+            }
+            # Agregar el diccionario a la lista de resultados
+            dataDic.append(dictionary)
+        return jsonify(dataDic)
+    except TypeError:
+        return jsonify({
+            'mensaje': 'Ocurrió un error al procesar la solicitud.'
+        }), 500  # Devuelve un código 500 Internal Server Error si ocurre un error en el servidor
+    finally:
+        cur.close()  # Cierra el cursor
+        c.close()    # Cierra la conexión con la base de datos
+
+@web_services.route('/list_price_work', methods=['GET'])
+def get_select_price_work():
+    try:
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur = c.cursor()
+        sql = "select DESCRIPCION, COSTO from ST_TIPO_PRECIO"
+        cur.execute(sql)
+        # Fetchall para obtener todos los resultados
+        result = cur.fetchall()
+        # Lista para almacenar los resultados como diccionarios
+        data_list = []
+        for row in result:
+            # Cada fila es una tupla, extraemos los valores
+            descripcion, costo = row
+            # Creamos un diccionario para cada fila
+            row_dict = {
+                'descripcion': descripcion,
+                'costo': costo
+            }
+            # Agregamos el diccionario a la lista de resultados
+            data_list.append(row_dict)
+
+        # Devolvemos los resultados utilizando jsonify
+        return jsonify(data_list)
+
+    except Exception as e:
+        # Si ocurre algún error, devolvemos un mensaje de error
+        return jsonify({
+            'mensaje': 'Ocurrió un error al procesar la solicitud: {}'.format(str(e))
+        }), 500  # Devolvemos un código 500 Internal Server Error
+
+
+
+
 
