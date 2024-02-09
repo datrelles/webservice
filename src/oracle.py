@@ -7,7 +7,6 @@ dotenv.load_dotenv()
 
 def connection(user,password):
     try:
-
         conexion = cx_Oracle.connect(
             user=user,
             password=password,
