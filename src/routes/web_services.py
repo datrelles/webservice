@@ -852,7 +852,125 @@ def get_select_price_work():
             'mensaje': 'Ocurrió un error al procesar la solicitud: {}'.format(str(e))
         }), 500  # Devolvemos un código 500 Internal Server Error
 
+@web_services.route('/getcode/comprobante_secuencial/<tipo_comprobante>', methods=['GET'])
+def get_comprobante_secuencial(tipo_comprobante):
+    try:
+        v_cod_empresa = 20
+        if tipo_comprobante=='alistamiento':
+            v_cod_tipo_comprobante = 'AL'
+        if tipo_comprobante=='mantenimiento':
+            v_cod_tipo_comprobante= 'MA'
+        v_cod_agencia = 1
+        query = """
+                            DECLARE
+                              v_cod_empresa           FLOAT := :1;
+                              v_cod_tipo_comprobante  VARCHAR2(50) := :2;
+                              v_cod_agencia           FLOAT := :3;
+                              v_result                VARCHAR2(50);
+                            BEGIN
+                              v_result := KC_ORDEN.asigna_cod_comprobante(p_cod_empresa => v_cod_empresa,
+                                                                          p_cod_tipo_comprobante => v_cod_tipo_comprobante,
+                                                                          p_cod_agencia => v_cod_agencia);
+                            :4 := v_result;
+                            END;
+                            """
+
+        # Obtener la conexión y el cursor
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur = c.cursor()
+
+        # Variable de salida para capturar el resultado
+        result_var = cur.var(cx_Oracle.STRING)
+
+        # Ejecutar la consulta
+        cur.execute(query, (v_cod_empresa, v_cod_tipo_comprobante, v_cod_agencia, result_var))
+        result = result_var.getvalue()
+        c.commit()
+        cur.close()
+        c.close()
+        return jsonify({"cod_secuencial_alistamiento": result})
+    except Exception as e:
+        # Si ocurre algún error, devolvemos un mensaje de error
+        return jsonify({
+            'mensaje': 'Ocurrió un error al procesar la solicitud: {}'.format(str(e))
+        }), 500  # Devolvemos un código 500 Internal Server Error
+
+@web_services.route('/info_moto/<type_placa_or_camv>/<camv_or_placa>', methods=['GET'])
+def get_infomoto_by_placa_or_camv(type_placa_or_camv, camv_or_placa):
+    try:
+        if type_placa_or_camv == 'placa':
+            placa = camv_or_placa
+            camv = ''
+            chasis = ''
+        if type_placa_or_camv == 'camv':
+            placa = ''
+            camv = camv_or_placa
+            chasis=''
+
+        if type_placa_or_camv == 'chasis':
+            placa = ''
+            camv = ''
+            chasis = camv_or_placa
 
 
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur = c.cursor()
+        sql = """
+            SELECT A.TIPO_IDENTIFICACION, A.IDENTIFICACION, A.NOMBRE, A.DIRECCION, A.TELEFONO, A.ANIO_ULTIMO_PAGO,  A.PLACA, 
+            b.COD_PRODUCTO, b.COD_MOTOR, b.COD_CHASIS, b.CAMVCPN, b.ANIO, b.COD_COLOR, c.nombre color, b.CILINDRAJE, 
+            b.TONELAJE, b.OCUPANTES, b.MODELO, b.CLASE, b.SUBCLASE 
+            FROM ST_MATRICULACION_MOTOS  A, ST_PROD_PACKING_LIST B, VT_VALORACION_SERIE V, st_color c
+            WHERE A.EMPRESA              =  20
+            AND  (A.CAMV_O_CPN           =  :camv
+            OR    A.PLACA                =  :placa
+            OR    b.cod_chasis           =  :chasis
+            )
+            AND   B.EMPRESA              =  A.EMPRESA
+            AND   B.CAMVCPN              =  A.CAMV_O_CPN
+            and   b.cod_producto         =  v.COD_PRODUCTO(+) 
+            AND   b.empresa              =  v.empresa(+) 
+            and   b.cod_chasis           =  v.NUMERO_SERIE(+) 
+            and   b.cod_color            =  c.cod_color            
+        """
+        result = cur.execute(sql, {'camv': camv, 'placa': placa, 'chasis': chasis}).fetchone()  # Añadir () para llamar a fetchone
+        print(result)
+        cur.close()
+        c.close()
 
+        # Keys correspondientes a cada valor
+        keys = [
+            "TIPO_IDENTIFICACION",
+            "IDENTIFICACION",
+            "NOMBRE",
+            "DIRECCION",
+            "TELEFONO",
+            "ANIO_ULTIMO_PAGO",
+            "PLACA",
+            "COD_PRODUCTO",
+            "COD_MOTOR",
+            "COD_CHASIS",
+            "CAMVCPN",
+            "ANIO",
+            "COD_COLOR",
+            "COLOR",
+            "CILINDRAJE",
+            "TONELAJE",
+            "OCUPANTES",
+            "MODELO",
+            "CLASE",
+            "SUBCLASE"
+        ]
+        resultado_dict = {keys[i]: result[i] for i in range(len(keys))}
+        if result:
+            return jsonify({
+                'resultado': resultado_dict # Devolver el resultado como JSON
+            }), 200
+        else:
+            return jsonify({
+                'mensaje': 'No se encontraron resultados para la consulta.'
+            }), 404
+    except Exception as e:
 
+        return jsonify({
+            'mensaje': 'Ocurrió un error al procesar la solicitud: {}'.format(str(e))
+        }), 500
