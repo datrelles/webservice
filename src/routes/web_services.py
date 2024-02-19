@@ -920,17 +920,17 @@ def get_infomoto_by_placa_or_camv(type_placa_or_camv, camv_or_placa):
             b.COD_PRODUCTO, b.COD_MOTOR, b.COD_CHASIS, b.CAMVCPN, b.ANIO, b.COD_COLOR, c.nombre color, b.CILINDRAJE, 
             b.TONELAJE, b.OCUPANTES, b.MODELO, b.CLASE, b.SUBCLASE 
             FROM ST_MATRICULACION_MOTOS  A, ST_PROD_PACKING_LIST B, VT_VALORACION_SERIE V, st_color c
-            WHERE A.EMPRESA              =  20
-            AND  (A.CAMV_O_CPN           =  :camv
-            OR    A.PLACA                =  :placa
-            OR    b.cod_chasis           =  :chasis
+            WHERE B.EMPRESA              =  20
+            AND  (B.CAMVCPN          =  :camv
+            OR    B.COD_CHASIS           = :chasis
+            OR    A.PLACA               = :placa
             )
-            AND   B.EMPRESA              =  A.EMPRESA
-            AND   B.CAMVCPN              =  A.CAMV_O_CPN
+            AND   B.EMPRESA              =  A.EMPRESA(+) 
+            AND   B.CAMVCPN              =  A.CAMV_O_CPN (+)
             and   b.cod_producto         =  v.COD_PRODUCTO(+) 
             AND   b.empresa              =  v.empresa(+) 
             and   b.cod_chasis           =  v.NUMERO_SERIE(+) 
-            and   b.cod_color            =  c.cod_color            
+            and   b.cod_color (+)        =  c.cod_color        
         """
         result = cur.execute(sql, {'camv': camv, 'placa': placa, 'chasis': chasis}).fetchone()  # Añadir () para llamar a fetchone
         print(result)
