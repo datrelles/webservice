@@ -413,7 +413,7 @@ def cargaMatriculas():
         data = request.get_json()
         print(data)
         anio = data.get('anio')
-        page_size = 100
+        page_size = 1000
         page_number = data.get('page', 1)
         offset = (page_number - 1) * page_size
         print(anio)
@@ -536,8 +536,6 @@ def saveMatriculas():
     except Exception as e:
         print(e)
         return jsonify({'error': str(e)}), 500
-
-
 # WS MODULE WARRANTY
 @web_services.route('/warranty/motorcycles', methods=['POST'])
 def warranty():
@@ -576,7 +574,6 @@ def warranty():
     except Exception as e:
         print(e)
         return jsonify({'Error en el registro del caso': str(e)}), 500
-
 def validar_campos(data):
     campos_necesarios = [
         "nombre_caso",
