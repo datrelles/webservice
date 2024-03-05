@@ -823,7 +823,7 @@ def get_select_price_work():
     try:
         c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
         cur = c.cursor()
-        sql = "select DESCRIPCION, COSTO from ST_TIPO_PRECIO"
+        sql = "select DESCRIPCION, COSTO, CODIGO_DURACION from ST_TIPO_PRECIO"
         cur.execute(sql)
         # Fetchall para obtener todos los resultados
         result = cur.fetchall()
@@ -831,11 +831,12 @@ def get_select_price_work():
         data_list = []
         for row in result:
             # Cada fila es una tupla, extraemos los valores
-            descripcion, costo = row
+            descripcion, costo, codigo_duracion = row
             # Creamos un diccionario para cada fila
             row_dict = {
                 'descripcion': descripcion,
-                'costo': costo
+                'costo': costo,
+                'cod_tipo_problema': codigo_duracion
             }
             # Agregamos el diccionario a la lista de resultados
             data_list.append(row_dict)
@@ -930,7 +931,7 @@ def get_infomoto_by_placa_or_camv(type_placa_or_camv, camv_or_placa):
             and   b.cod_color (+)        =  c.cod_color        
         """
         result = cur.execute(sql, {'camv': camv, 'placa': placa, 'chasis': chasis}).fetchone()  # Añadir () para llamar a fetchone
-        print(result)
+        #print(result)
         cur.close()
         c.close()
 
@@ -971,3 +972,22 @@ def get_infomoto_by_placa_or_camv(type_placa_or_camv, camv_or_placa):
         return jsonify({
             'mensaje': 'Ocurrió un error al procesar la solicitud: {}'.format(str(e))
         }), 500
+
+#WS BLUBEAR
+@web_services.route ('/marcas/dropdown', methods=['GET'])
+def dropdown_marcas():
+    try:
+        with oracle.connection(getenv("USERORA"), getenv("PASSWORD")) as c:
+            cur = c.cursor()
+            sql = """
+                SELECT nombre, cod_marca from marca a
+                where a.empresa       =   20
+                and   a.es_propia     =   1
+                and   a.descuento_promocion = 'S'
+                 """
+            cur.execute(sql)
+            listOfmarcas = [{"nombre": marca[0], "cod_marca": marca[1]} for marca in cur.fetchall()]
+            return jsonify(listOfmarcas), 200
+    except Exception as e:
+        return jsonify({'Error del servidor': str(e)}), 500
+
