@@ -973,6 +973,36 @@ def get_infomoto_by_placa_or_camv(type_placa_or_camv, camv_or_placa):
             'mensaje': 'Ocurrió un error al procesar la solicitud: {}'.format(str(e))
         }), 500
 
+@web_services.route('/list_price_work/<cod_tipo_problema>', methods=['GET'])
+def get_select_price_work_for_code(cod_tipo_problema):
+    try:
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur = c.cursor()
+        sql = "select DESCRIPCION, COSTO, CODIGO_DURACION from ST_TIPO_PRECIO where CODIGO_DURACION= :cod_tipo_problema "
+        cur.execute(sql, {'cod_tipo_problema':cod_tipo_problema})
+        # Fetchall para obtener todos los resultados
+        result = cur.fetchall()
+        # Lista para almacenar los resultados como diccionarios
+        data_list = []
+        for row in result:
+            # Cada fila es una tupla, extraemos los valores
+            descripcion, costo, codigo_duracion = row
+            # Creamos un diccionario para cada fila
+            row_dict = {
+                'descripcion': descripcion,
+                'costo': costo,
+                'cod_tipo_problema': codigo_duracion
+            }
+            # Agregamos el diccionario a la lista de resultados
+            data_list.append(row_dict)
+
+        # Devolvemos los resultados utilizando jsonify
+        return jsonify(data_list)
+    except Exception as e:
+        # Si ocurre algún error, devolvemos un mensaje de error
+        return jsonify({
+            'mensaje': 'Ocurrió un error al procesar la solicitud: {}'.format(str(e))
+        }), 500  # Devolvemos un código 500 Internal Server Error
 #WS BLUBEAR
 @web_services.route ('/marcas/dropdown', methods=['GET'])
 def dropdown_marcas():
