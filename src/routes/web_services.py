@@ -594,7 +594,7 @@ def validar_campos(data):
 def set_non_variable_data(data):
     data['empresa'] = 20
     data['tipo_comprobante'] = 'CP'
-    fecha_formateada = datetime.strptime(data['fecha'], '%d/%m/%Y %H:%M:%S')
+    fecha_formateada = datetime.strptime(data['fecha'], '%Y/%m/%d %H:%M:%S')
     data['fecha'] = fecha_formateada
     data['codigo_nacion'] = 1
     data['codigo_responsable'] = 'WSSHIBOT'
@@ -603,7 +603,7 @@ def set_non_variable_data(data):
     fecha_venta = datetime.strptime(data['fecha_venta'], '%Y/%m')
     data['fecha_venta'] = fecha_venta
     data['aplica_garantia'] = 2
-    #datetime.strptime(record["FECHA ULTIMA MATRICULA"], '%d/%m/%Y')
+
 def generate_comprobante_code(data, dataCaso):
     v_cod_empresa = 20
     v_cod_tipo_comprobante = 'CP'
@@ -1004,20 +1004,95 @@ def get_select_price_work_for_code(cod_tipo_problema):
             'mensaje': 'Ocurrió un error al procesar la solicitud: {}'.format(str(e))
         }), 500  # Devolvemos un código 500 Internal Server Error
 #WS BLUBEAR
-@web_services.route ('/marcas/dropdown', methods=['GET'])
-def dropdown_marcas():
+@web_services.route('/marcas/dropdown', methods=['GET'])
+def dropdown_despieces():
     try:
-        with oracle.connection(getenv("USERORA"), getenv("PASSWORD")) as c:
-            cur = c.cursor()
-            sql = """
-                SELECT nombre, cod_marca from marca a
-                where a.empresa       =   20
-                and   a.es_propia     =   1
-                and   a.descuento_promocion = 'S'
-                 """
-            cur.execute(sql)
-            listOfmarcas = [{"nombre": marca[0], "cod_marca": marca[1]} for marca in cur.fetchall()]
-            return jsonify(listOfmarcas), 200
-    except Exception as e:
-        return jsonify({'Error del servidor': str(e)}), 500
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+        sql = """
+                SELECT nombre_e, cod_despiece
+                    FROM st_despiece
+                WHERE empresa = 20
+                    AND nivel = 1
+                    AND cod_despiece IN ('S', 'B', 'E')
+                """
+        brands = cursor.execute(sql).fetchall()
 
+        list_brands = []
+        for brand in brands:
+            print(brand)
+            dict = {
+                "MARCA": brand[0],
+                "COD_MARCA": brand[1]
+            }
+            list_brands.append(dict)
+        return jsonify(list_brands), 200
+    except Exception as e:
+        print(e)
+        return jsonify({'Error del servidor': str(e)}), 50
+
+@web_services.route('/categories/dropdown', methods=['GET'])
+def dropdown_categories():
+    try:
+        cod_despiece_padre = request.args.get('cod_marca')
+        cod_despiece_padre =cod_despiece_padre.upper()
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+        sql = """
+            SELECT 
+                    cod_despiece,
+                    nombre_e,
+                    nivel,
+                    cod_despiece_padre
+       
+            FROM st_despiece
+            WHERE  empresa=20
+            AND    nivel=2
+            AND    cod_despiece_padre=:cod_despiece_padre
+                """
+        categories = cursor.execute(sql, {"cod_despiece_padre": cod_despiece_padre}).fetchall()
+        list_categories = []
+        for category in categories:
+            dict = {
+                "COD_CATEGORIA": category[0],
+                "CATEGORIA": category[1]
+            }
+            list_categories.append(dict)
+        return jsonify(list_categories), 200
+    except Exception as e:
+        print(e)
+        return jsonify({'Error del servidor': str(e)}), 50
+
+
+@web_services.route('/modelos/dropdown', methods=['GET'])
+def dropdown_modelos():
+    try:
+        cod_despiece_padre = request.args.get('cod_modelo')
+        cod_despiece_padre = cod_despiece_padre.upper()
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+        sql = """
+            SELECT 
+                    cod_despiece,
+                    nombre_e,
+                    nivel,
+                    cod_despiece_padre
+
+            FROM st_despiece
+            WHERE  empresa=20
+            AND    nivel=3
+            AND    cod_despiece_padre=:cod_despiece_padre
+                """
+
+        categories = cursor.execute(sql, {"cod_despiece_padre": cod_despiece_padre}).fetchall()
+        list_categories = []
+        for category in categories:
+            dict = {
+                "COD_CATEGORIA": category[0],
+                "CATEGORIA": category[1]
+            }
+            list_categories.append(dict)
+        return jsonify(list_categories), 200
+    except Exception as e:
+        print(e)
+        return jsonify({'Error del servidor': str(e)}), 50
