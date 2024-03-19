@@ -292,7 +292,7 @@ def searchProduct():
         cur_01 = c.cursor()
         # Escribe la consulta
         sql_query = """
- SELECT
+            SELECT
             P.COD_PRODUCTO,
             P.NOMBRE,
             P.IVA,
@@ -684,13 +684,15 @@ def get_taller_info(data):
     c.close()
 def get_motor_info(data):
     num_motor = data['cod_motor']
-
+    print('enter')
     if not num_motor:
         return jsonify({"error": "Se requiere el campo 'cod_motor'"})
 
     data_motor = oracle.infoMotor(num_motor)
     data['cod_producto'] = data_motor[1]
     data['cod_distribuidor_cli'] = data_motor[0]
+    print(data['cod_producto'])
+    print(data['cod_distribuidor_cli'])
 def save_cod_tipo_problema(data):
     c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
     cur = c.cursor()

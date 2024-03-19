@@ -68,12 +68,12 @@ def infoMotor(motor):
     plsql_block = """
         DECLARE
             v_empresa       NUMBER := 20; -- Reemplaza con el valor adecuado
-            v_numero_motor  VARCHAR2(50) := :1; -- Reemplaza con el valor adecuado
-            v_distribuidor  VARCHAR2(50); -- Variable de salida
-            v_cod_producto  VARCHAR2(50); -- Variable de salida
-            v_numero_chasis VARCHAR2(50); -- Variable de salida
-            v_importacion VARCHAR2(50); -- Variable de salida
-            v_nombreDistribuidor VARCHAR2(50);--Variable de salida
+            v_numero_motor  ST_PROD_PACKING_LIST.COD_MOTOR%TYPE := :1; -- Reemplaza con el valor adecuado
+            v_distribuidor  VARCHAR2(100); -- Variable de salida
+            v_cod_producto  VARCHAR2(100); -- Variable de salida
+            v_numero_chasis VARCHAR2(100); -- Variable de salida
+            v_importacion VARCHAR2(100); -- Variable de salida
+            v_nombreDistribuidor VARCHAR2(100);--Variable de salida
             REG_CLIENTE CLIENTE%ROWTYPE;
 	        REG_VALORACION TC_VALORACION%ROWTYPE;
         BEGIN
