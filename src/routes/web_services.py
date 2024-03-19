@@ -292,7 +292,7 @@ def searchProduct():
         cur_01 = c.cursor()
         # Escribe la consulta
         sql_query = """
- SELECT
+            SELECT
             P.COD_PRODUCTO,
             P.NOMBRE,
             P.IVA,
@@ -684,13 +684,15 @@ def get_taller_info(data):
     c.close()
 def get_motor_info(data):
     num_motor = data['cod_motor']
-
+    print('enter')
     if not num_motor:
         return jsonify({"error": "Se requiere el campo 'cod_motor'"})
 
     data_motor = oracle.infoMotor(num_motor)
     data['cod_producto'] = data_motor[1]
     data['cod_distribuidor_cli'] = data_motor[0]
+    print(data['cod_producto'])
+    print(data['cod_distribuidor_cli'])
 def save_cod_tipo_problema(data):
     c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
     cur = c.cursor()
@@ -931,7 +933,6 @@ def get_infomoto_by_placa_or_camv(type_placa_or_camv, camv_or_placa):
             and   b.cod_color (+)        =  c.cod_color        
         """
         result = cur.execute(sql, {'camv': camv, 'placa': placa, 'chasis': chasis}).fetchone()  # Añadir () para llamar a fetchone
-        #print(result)
         cur.close()
         c.close()
 
@@ -980,29 +981,23 @@ def get_select_price_work_for_code(cod_tipo_problema):
         cur = c.cursor()
         sql = "select DESCRIPCION, COSTO, CODIGO_DURACION from ST_TIPO_PRECIO where CODIGO_DURACION= :cod_tipo_problema "
         cur.execute(sql, {'cod_tipo_problema':cod_tipo_problema})
-        # Fetchall para obtener todos los resultados
         result = cur.fetchall()
-        # Lista para almacenar los resultados como diccionarios
         data_list = []
         for row in result:
-            # Cada fila es una tupla, extraemos los valores
             descripcion, costo, codigo_duracion = row
-            # Creamos un diccionario para cada fila
             row_dict = {
                 'descripcion': descripcion,
                 'costo': costo,
                 'cod_tipo_problema': codigo_duracion
             }
-            # Agregamos el diccionario a la lista de resultados
             data_list.append(row_dict)
-
-        # Devolvemos los resultados utilizando jsonify
         return jsonify(data_list)
     except Exception as e:
-        # Si ocurre algún error, devolvemos un mensaje de error
+        # error message
         return jsonify({
             'mensaje': 'Ocurrió un error al procesar la solicitud: {}'.format(str(e))
-        }), 500  # Devolvemos un código 500 Internal Server Error
+        }), 500  #500 Internal Server Error
+
 #WS BLUBEAR
 @web_services.route('/marcas/dropdown', methods=['GET'])
 def dropdown_despieces():
@@ -1053,6 +1048,8 @@ def dropdown_categories():
         categories = cursor.execute(sql, {"cod_despiece_padre": cod_despiece_padre}).fetchall()
         list_categories = []
         for category in categories:
+            if category[0] =='SGN' or category[0]=='BGN':
+                continue
             dict = {
                 "COD_CATEGORIA": category[0],
                 "CATEGORIA": category[1]
@@ -1063,11 +1060,10 @@ def dropdown_categories():
         print(e)
         return jsonify({'Error del servidor': str(e)}), 50
 
-
 @web_services.route('/modelos/dropdown', methods=['GET'])
 def dropdown_modelos():
     try:
-        cod_despiece_padre = request.args.get('cod_modelo')
+        cod_despiece_padre = request.args.get('cod_categoria')
         cod_despiece_padre = cod_despiece_padre.upper()
         c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
         cursor = c.cursor()
@@ -1088,11 +1084,67 @@ def dropdown_modelos():
         list_categories = []
         for category in categories:
             dict = {
-                "COD_CATEGORIA": category[0],
-                "CATEGORIA": category[1]
+                "COD_MODELO": category[0],
+                "MODELO": category[1]
             }
             list_categories.append(dict)
         return jsonify(list_categories), 200
     except Exception as e:
         print(e)
-        return jsonify({'Error del servidor': str(e)}), 50
+        return jsonify({'Error del servidor': str(e)}), 500
+
+@web_services.route('/subsistema/dropdown', methods=['GET'])
+def dropdown_subsistema():
+    try:
+        cod_modelo = request.args.get('cod_modelo')
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+        sql = """
+                            SELECT  DISTINCT  MI.NOMBRE
+                            FROM ST_PRODUCTO_DESPIECE D, ST_DESPIECE DP, PRODUCTO p, TG_MODELO_ITEM mi
+                            where dp.empresa                         =                         20
+                            and   dp.cod_despiece_padre              =                         :cod_modelo
+                            and   d.COD_DESPIECE                     =                         dp.cod_despiece
+                            and   d.EMPRESA                          =                         dp.empresa
+                            and   p.empresa                          =                         d.empresa
+                            and   p.cod_producto                     =                         d.cod_producto
+                            and   mi.empresa                         =                         p.empresa
+                            and   mi.cod_modelo                      =                         p.cod_modelo_cat1
+                            and   mi.cod_item                        =                         p.cod_item_cat1
+                            and   mi.cod_item                        !=                        'PTA'  
+        """
+        subsystems = cursor.execute(sql, {"cod_modelo": cod_modelo}).fetchall()
+        subsystems_dict = []
+        for subsystem in subsystems:
+            dict = {
+                "SUBSISTEMA": subsystem[0]
+            }
+            subsystems_dict.append(dict)
+        return jsonify(subsystems_dict)
+    except Exception as e:
+        print(e)
+        return jsonify({'Error del servidor': str(e)}), 500
+
+@web_services.route('/anio/dropdown', methods=['GET'])
+def dropdown_anio_repuesto():
+    try:
+        modelo_name = request.args.get('modelo_name')
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+        sql = """
+                SELECT DISTINCT AAAA 
+                FROM        VT_MODELOS_MOTOS_ANIO_BI
+                WHERE       NOMBRE        =       :modelo_name
+        """
+        subsystems = cursor.execute(sql, {"modelo_name": modelo_name}).fetchall()
+        subsystems_dict = []
+        for subsystem in subsystems:
+            dict = {
+                "AÑO": subsystem[0]
+            }
+            subsystems_dict.append(dict)
+
+        return jsonify(subsystems_dict)
+    except Exception as e:
+        print(e)
+        return jsonify({'Error del servidor': str(e)}), 500
