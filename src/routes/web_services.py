@@ -73,7 +73,6 @@ def atelier_by_id():
 
 @web_services.route("/pedidos", methods=["GET"])
 def pedido_by_code():
-
     try:
         c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
         cur_01 = c.cursor()
@@ -1148,3 +1147,114 @@ def dropdown_anio_repuesto():
     except Exception as e:
         print(e)
         return jsonify({'Error del servidor': str(e)}), 500
+
+@web_services.route('/all_parts', methods=['GET'])
+def get_all_parts():
+    try:
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+        sql = """
+            SELECT 
+                D.COD_PRODUCTO,
+                P.NOMBRE AS NOMBRE_PRODUCTO,
+                P.IVA,
+                P.ICE,
+                C.nombre color,
+                BUF.ES_BUFFER AS CONTROL_BUFFER,
+                DP.COD_DESPIECE_PADRE AS CODIGO_MODELO_MOTO,
+                DP2.NOMBRE_E AS MOTO_MODELO,
+                MI.NOMBRE AS NOMBRE_SUBSISTEMA,
+                MI.COD_ITEM AS CODIGO_SUBSISTEMA,
+                DP2.COD_DESPIECE_PADRE AS CODIGO_CATEGORIA,
+                DP3.NOMBRE_E AS NOMBRE_CATEGORIA,
+                DP4.NOMBRE_E AS NOMBRE_MARCA,
+                DP4.COD_DESPIECE AS CODIGO_MARCA,
+                L.COD_AGENCIA,
+                B.BODEGA,
+                B.NOMBRE AS NOMBRE_BODEGA,
+                L.COD_UNIDAD,
+                L.PRECIO
+            FROM 
+                ST_PRODUCTO_DESPIECE D,
+                ST_DESPIECE DP,
+                PRODUCTO P,
+                TG_MODELO_ITEM MI,
+                ST_DESPIECE DP2,
+                ST_DESPIECE DP3,
+                ST_DESPIECE DP4,
+                ST_PRODUCTO_BUFFER BUF,
+                ST_COLOR C,
+                ST_LISTA_PRECIO L,
+                BODEGA B,
+                ST_MATERIAL_IMAGEN IM
+            WHERE 
+                DP.EMPRESA = 20
+                AND D.COD_DESPIECE = DP.COD_DESPIECE
+                AND D.EMPRESA = DP.EMPRESA
+                AND P.EMPRESA = D.EMPRESA
+                AND DP2.EMPRESA = D.EMPRESA
+                AND DP3.EMPRESA = DP2.EMPRESA
+                AND DP4.EMPRESA = DP3.EMPRESA
+                AND MI.EMPRESA = P.EMPRESA
+                AND C.COD_COLOR = P.PARTIDA
+                AND BUF.COD_PRODUCTO = P.COD_PRODUCTO
+                AND BUF.EMPRESA = P.EMPRESA
+                AND P.COD_MODELO_CAT1 = MI.COD_MODELO
+                AND P.COD_ITEM_CAT1 = MI.COD_ITEM
+                AND D.COD_PRODUCTO = P.COD_PRODUCTO
+                AND DP.COD_DESPIECE_PADRE = DP2.COD_DESPIECE
+                AND DP2.COD_DESPIECE_PADRE = DP3.COD_DESPIECE
+                AND DP3.COD_DESPIECE_PADRE = DP4.COD_DESPIECE
+                AND DP4.COD_DESPIECE NOT IN ('U', '1', 'L')
+                AND L.COD_PRODUCTO = P.COD_PRODUCTO
+                AND L.COD_AGENCIA = 50
+                AND L.COD_UNIDAD = P.COD_UNIDAD
+                AND L.COD_FORMA_PAGO = 'EFE'
+                AND L.COD_DIVISA = 'DOLARES'
+                AND L.COD_MODELO_CLI = 'CLI1'
+                AND L.COD_ITEM_CLI = 'CF'
+                AND L.ESTADO_GENERACION = 'R' 
+                AND (L.FECHA_FINAL IS NULL OR  L.FECHA_FINAL >= TRUNC(SYSDATE))
+                AND B.EMPRESA = L.EMPRESA
+                AND B.BODEGA = L.COD_AGENCIA
+                AND IM.COD_TIPO_MATERIAL = 'PRO'
+                AND IM.COD_MATERIAL = P.COD_PRODUCTO
+                AND IM.EMPRESA = P.EMPRESA
+        """
+        cursor.execute(sql)
+        results = []
+        for row in cursor.fetchall():
+            #host = '192.168.30.8:5000'
+            host = '200.105.245.182:5000'
+            imagen_url = f"http://{host}/imageApi/img?code={row[0]}"
+            anios = [2020, 2021, 2022]
+            result_dict = {
+                'COD_PRODUCTO': row[0],
+                'NOMBRE_PRODUCTO': row[1],
+                'IVA': row[2],
+                'ICE': row[3],
+                'COLOR': row[4],
+                'CONTROL_BUFFER': row[5],
+                'CODIGO_MODELO_MOTO': row[6],
+                'MOTO_MODELO': row[7],
+                'NOMBRE_SUBSISTEMA': row[8],
+                'CODIGO_SUBSISTEMA': row[9],
+                'CODIGO_CATEGORIA': row[10],
+                'NOMBRE_CATEGORIA': row[11],
+                'NOMBRE_MARCA': row[12],
+                'CODIGO_MARCA': row[13],
+                'COD_AGENCIA': row[14],
+                'BODEGA': row[15],
+                'NOMBRE_BODEGA': row[16],
+                'COD_UNIDAD': row[17],
+                'PRECIO': row[18],
+                'URL_IMAGE': imagen_url,
+                'ANIO': anios
+            }
+            results.append(result_dict)
+        return jsonify(results)
+
+    except Exception as e:
+        print(e)
+        return jsonify({'error': str(e)})
+
