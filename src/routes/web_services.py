@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from numpy.core.defchararray import upper
 from os import getenv
-from datetime import datetime
+from datetime import datetime, date
 import cx_Oracle
 from src.function_jwt import validate_token
 from src import oracle
@@ -19,7 +19,6 @@ def verify_token_middleware():
 
 @web_services.route("/atelier", methods=["POST"])
 def atelier():
-
     try:
         c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
         cur_01 = c.cursor()
@@ -997,7 +996,8 @@ def get_select_price_work_for_code(cod_tipo_problema):
             'mensaje': 'Ocurrió un error al procesar la solicitud: {}'.format(str(e))
         }), 500  #500 Internal Server Error
 
-#WS BLUBEAR
+##--------------------------WS BLUBEAR-----------------------------------------------##
+
 @web_services.route('/marcas/dropdown', methods=['GET'])
 def dropdown_despieces():
     try:
@@ -1233,4 +1233,47 @@ WHERE
     except Exception as e:
         print(e)
         return jsonify({'error': str(e)})
+@web_services.route('/checkStock', methods=['POST'])
+def check_stock(): #EndPoint to check stock before purchase
+    try:
+        # Get the parameters from the request.
+        empresa = 20    #default Massline
+        agencia = 10    #The Ecommerce agency's code
+        data = request.get_json()
+        db = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = db.cursor()
+        parts = []
+        #Verify the stock availability for each part and provide the corresponding information
+        for products in data:
+            flag_available = False
+            result = validate_existance(cursor, products['cod_producto'], empresa, agencia)
+            if result >= int(products['quantity']):
+                flag_available = True
+            parts.append({'cod_producto': products['cod_producto'], 'available': result, 'complete_purchase': flag_available})
+        cursor.close()
+        return jsonify(parts)
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
+
+def validate_existance(cursor, cod_producto, empresa, cod_agencia): #Verify function for tha stock inventary
+    try:
+        cursor.execute("""
+                    SELECT KS_INVENTARIO.consulta_existencia(
+                        :param1,
+                        :param2,
+                        :param3,
+                        :param4,
+                        TO_DATE(:param5, 'YYYY/MM/DD'),
+                        :param6,
+                        :param7,
+                        :param8 
+                    ) AS resultado
+                    FROM dual
+                """,
+                       param1=empresa, param2=cod_agencia, param3=cod_producto, param4='U', param5=date.today(), param6=1, param7='Z',
+                       param8=1)
+        result = cursor.fetchone()
+        return result[0]
+    except Exception as e:
+        return str(e)
