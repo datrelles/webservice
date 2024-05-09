@@ -1254,9 +1254,7 @@ def check_stock(): #EndPoint to check stock before purchase
         return jsonify(parts)
     except Exception as e:
         return jsonify({'error': str(e)})
-
-
-def validate_existance(cursor, cod_producto, empresa, cod_agencia): #Verify function for tha stock inventary
+def validate_existance(cursor, cod_producto, empresa, cod_agencia): #Verify function for the stock inventary
     try:
         cursor.execute("""
                     SELECT KS_INVENTARIO.consulta_existencia(
@@ -1276,4 +1274,37 @@ def validate_existance(cursor, cod_producto, empresa, cod_agencia): #Verify func
         result = cursor.fetchone()
         return result[0]
     except Exception as e:
+        return str(e)
+
+@web_services.route('/get_info_cliente_facturacion', methods=['GET'])
+def get_data_clients():
+    try:
+        empresa = 20  # default Massline
+        type_id = request.args.get('type_id') #type of id document 1: cedula, 2 Ruc, 3 passaport
+        cod_client = request.args.get('id')
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+        cursor.execute("""
+            select a.cod_cliente, a.nombre, a.apellido1, b.direccion_calleh, b.celular, b.email_factura from cliente a, cliente_hor b WHERE
+            a.empresa                         =                         :empresa
+            and b.empresah                    =                         a.empresa
+            and a.cod_cliente                 =                         :cod_client
+            and a.cod_cliente                 =                         b.cod_clienteh
+            and a.cod_tipo_identificacion     =                         :tipo_identificacion
+            
+                                                                  """, tipo_identificacion=type_id, empresa=empresa, cod_client=cod_client)
+
+        client = cursor.fetchone()
+        data_client = {
+                'id':           client[0] if client[0] is not None else '',
+                'nombres':       client[1] if client[1] is not None else '',
+                'apellidos':     client[2] if client[2] is not None else '',
+                'direccion':    client[3] if client[3] is not None else '',
+                'celular':      client[4] if client[4] is not None else '',
+                'email':        client[5] if client[5] is not None else ''
+                }
+        c.close()
+        return jsonify({'cliente': data_client})
+    except Exception as e:
+        print(e)
         return str(e)
