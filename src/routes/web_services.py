@@ -1277,34 +1277,92 @@ def validate_existance(cursor, cod_producto, empresa, cod_agencia): #Verify func
         return str(e)
 
 @web_services.route('/get_info_cliente_facturacion', methods=['GET'])
-def get_data_clients():
+def get_data_clients(): #endPoint to get data from a client, it needs values: id and type of id
     try:
         empresa = 20  # default Massline
         type_id = request.args.get('type_id') #type of id document 1: cedula, 2 Ruc, 3 passaport
         cod_client = request.args.get('id')
+        cod_client = cod_client[:-1] + "-" + cod_client[-1]
         c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
         cursor = c.cursor()
         cursor.execute("""
             select a.cod_cliente, a.nombre, a.apellido1, b.direccion_calleh, b.celular, b.email_factura from cliente a, cliente_hor b WHERE
             a.empresa                         =                         :empresa
             and b.empresah                    =                         a.empresa
-            and a.cod_cliente                 =                         :cod_client
-            and a.cod_cliente                 =                         b.cod_clienteh
             and a.cod_tipo_identificacion     =                         :tipo_identificacion
+            and a.cod_cliente                 =                         :cod_client
+            and b.cod_clienteh                 =                         a.cod_cliente       
             
                                                                   """, tipo_identificacion=type_id, empresa=empresa, cod_client=cod_client)
 
         client = cursor.fetchone()
-        data_client = {
-                'id':           client[0] if client[0] is not None else '',
-                'nombres':       client[1] if client[1] is not None else '',
-                'apellidos':     client[2] if client[2] is not None else '',
+        if client:
+            data_client = {
+                'id':           client[0].replace("-", "") if client[0] is not None else '',
+                'nombres':      client[1] if client[1] is not None else '',
+                'apellidos':    client[2] if client[2] is not None else '',
                 'direccion':    client[3] if client[3] is not None else '',
                 'celular':      client[4] if client[4] is not None else '',
                 'email':        client[5] if client[5] is not None else ''
                 }
+        else:
+            data_client = {
+                'estado': 'NO REGISTRADO'
+            }
         c.close()
-        return jsonify({'cliente': data_client})
+        return jsonify({'cliente': data_client}), 200
     except Exception as e:
         print(e)
         return str(e)
+
+@web_services.route('/save_new_data_client', methods=['POST'])
+def save_new_data_client():
+    try:
+        data_client = json.loads(request.data)
+        empresa = 20  # default Massline
+        type_client = 'CF'
+        cod_client = data_client['id']
+        cod_client = cod_client[:-1] + "-" + cod_client[-1]
+        if checkJsonData_json(data_client):
+
+            c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+            cursor = c.cursor()
+            try:
+                cursor.execute("""
+                                INSERT INTO cliente (empresa, cod_cliente, nombre, apellido1, cod_tipo_identificacion)
+                                VALUES (:empresa, :cod_cliente, :name, :second_name, :cod_tipo_id)
+                                """, empresa=empresa, cod_cliente=cod_client,
+                               name=data_client['nombre'].upper(), second_name=data_client['apellidos'].upper(),
+                               cod_tipo_id=data_client['type_id'])
+
+                cursor.execute("""
+                                INSERT INTO cliente_hor (empresah, cod_clienteh, direccion_calleh, celular, email_factura, cod_tipo_clienteh)
+                                VALUES (:empresa, :cod_cliente, :address, :phone,:email, :cod_type_client)
+                                """, empresa=empresa, cod_cliente=cod_client,
+                               address=data_client['direccion'].upper(),
+                               phone=data_client['celular'], email=data_client['email'].upper(), cod_type_client= type_client)
+                c.commit()
+                return jsonify({"Registro exitoso": "1"})
+            except Exception as e:
+                c.rollback()
+                print(e)
+                return str(e)
+            finally:
+                cursor.close()
+        else:
+            return jsonify({'error': 'El JSON contiene valores no válidos'}), 400
+
+    except Exception as e:
+        print(e)
+        return str(e)
+def checkJsonData_json(json_data):
+    for key, value in json_data.items():
+        if key != 'type_id' and not isinstance(value, str):
+            return False
+    if isinstance(json_data['type_id'], int):
+        return True
+    else:
+        return False
+
+
+##-------------------------------------------------------------------------------------------
