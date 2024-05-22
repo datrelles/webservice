@@ -6,6 +6,7 @@ import cx_Oracle
 from src.function_jwt import validate_token
 from src import oracle
 import json
+import random
 
 web_services = Blueprint("web_services", __name__)
 
@@ -1375,7 +1376,9 @@ def save_invoice_cf_parts():
     if not is_valid:
         return jsonify({"error": "Missing data", "details": error_message}), 400
     #
-    return jsonify({"message": "Transaction completed successfully", "data": data_invoice}), 200
+    number = random.randint(1, 100)
+    message = f"F1-0653{number}"
+    return jsonify({"message": "Transaction completed successfully", "data": data_invoice, "order_code": message}), 200
 
 
 def validate_data(data):
