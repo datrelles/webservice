@@ -1364,5 +1364,55 @@ def checkJsonData_json(json_data):
     else:
         return False
 
+@web_services.route('/save_invoice/cf/parts', methods=['POST'])
+def save_invoice_cf_parts():
+    data_invoice = json.loads(request.data)
+    if not data_invoice:
+        return jsonify({"error": "No input data provided"}), 400
+
+    # validate received data
+    is_valid, error_message = validate_data(data_invoice)
+    if not is_valid:
+        return jsonify({"error": "Missing data", "details": error_message}), 400
+    #
+    return jsonify({"message": "Transaction completed successfully", "data": data_invoice}), 200
+
+
+def validate_data(data):
+    # Lista de campos obligatorios a nivel superior
+    required_fields = ['id', 'paymentType', 'paymentBrand', 'amount', 'currency', 'batchNo']
+    # Lista de campos obligatorios para la tarjeta y el cliente
+    required_card_fields = ['cardType', 'bin', 'last4Digits', 'holder', 'expiryMonth', 'expiryYear', 'acquirerCode']
+    required_client_fields = ['name', 'lastName', 'clientId', 'address']
+
+    # Verificar que todos los campos a nivel superior estén presentes y no estén vacíos
+    for field in required_fields:
+        if field not in data or data[field] in [None, '']:
+            return False, f"Missing or empty field: {field}"
+
+    # Verificar que la información de la tarjeta esté presente y sea válida
+    if 'card' not in data:
+        return False, "Missing card data"
+    for field in required_card_fields:
+        if field not in data['card'] or data['card'][field] in [None, '']:
+            return False, f"Missing or empty field in card: {field}"
+
+    # Verificar que la información del cliente esté presente y sea válida
+    if 'client' not in data:
+        return False, "Missing client data"
+
+    for field in required_client_fields:
+        if field not in data['client'] or data['client'][field] in [None, '']:
+            return False, f"Missing or empty field in client: {field}"
+    if 'cod_products' not in data:
+        return False, "Missing cod_products data"
+    cod_products = data['cod_products']
+    if isinstance(cod_products, list) and len(cod_products) > 0:  # Verifica que sea una lista y no esté vacía
+        pass
+    else:
+        return False, "Missing cod_products data"
+
+
+    return True, None
 
 ##-------------------------------------------------------------------------------------------
