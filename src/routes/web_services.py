@@ -1367,20 +1367,27 @@ def checkJsonData_json(json_data):
 
 @web_services.route('/save_invoice/cf/parts', methods=['POST'])
 def save_invoice_cf_parts():
-    data_invoice = json.loads(request.data)
-    if not data_invoice:
-        return jsonify({"error": "No input data provided"}), 400
+    try:
+        data_invoice = json.loads(request.data)
+        empresa = 20  # for this Ws default 20 = massline
+        if not data_invoice:
+            return jsonify({"error": "No input data provided"}), 400
 
-    # validate received data
-    is_valid, error_message = validate_data(data_invoice)
-    if not is_valid:
-        return jsonify({"error": "Missing data", "details": error_message}), 400
-    #
-    number = random.randint(1, 100)
-    message = f"F1-0653{number}"
-    return jsonify({"message": "Transaction completed successfully", "data": data_invoice, "order_code": message}), 200
-
-
+        # validate received data
+        is_valid, error_message = validate_data(data_invoice)
+        if not is_valid:
+            return jsonify({"error": "Missing data", "details": error_message}), 400
+    #-----------------------OPERATION --------------------------------------
+        flag_save_bill = save_data_bill_extended(data_invoice, empresa)
+        if flag_save_bill==True:
+    #-----------------------------------------------------------------------
+            number = random.randint(1, 100)
+            message = f"F1-0653{number}"
+            return jsonify({"message": "Transaction completed successfully", "data": data_invoice, "order_code": message}), 200
+        else:
+            return jsonify({"error": flag_save_bill})
+    except Exception as e:
+        return str(e)
 def validate_data(data):
     # Lista de campos obligatorios a nivel superior
     required_fields = ['id', 'paymentType', 'paymentBrand', 'amount', 'currency', 'batchNo']
@@ -1417,5 +1424,147 @@ def validate_data(data):
 
 
     return True, None
+def save_data_bill_extended(data_invoice, empresa):
+    # Extrae datos del JSON
+    id_transaction = data_invoice['id']
+    payment_type = data_invoice['paymentType']
+    payment_brand = data_invoice['paymentBrand']
+    amount = data_invoice['amount']
+    currency = data_invoice['currency']
+    batch_no = data_invoice['batchNo']
+    card_type = data_invoice['card']['cardType']
+    bin_card = data_invoice['card']['bin']
+    last_4_digits = data_invoice['card']['last4Digits']
+    holder = data_invoice['card']['holder']
+    expiry_month = data_invoice['card']['expiryMonth']
+    expiry_year = data_invoice['card']['expiryYear']
+    acquirer_code = data_invoice['card']['acquirerCode']
+    client_type_id = data_invoice['client']['typeId']
+    client_name = data_invoice['client']['name']
+    client_last_name = data_invoice['client']['lastName']
+    client_id = data_invoice['client']['clientId']
+    client_address = data_invoice['client']['address']
+    cod_products = data_invoice['cod_products']
+    id_guia_servientrega = data_invoice['idGuiaServientrega']
+
+    c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+    cursor = c.cursor()
+    try:
+        # Insert into st_cab_datafast
+        cursor.execute(
+        """ INSERT INTO st_cab_datafast (
+                empresa, id_transaction, payment_type, payment_brand, amount, currency, batch_no,
+                card_type, bin_card, last_4_digits, holder, expiry_month, expiry_year,
+                acquirer_code, client_type_id, client_name, client_last_name, client_id, client_address,id_guia_servientrega 
+            ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17, :18, :19, :20) """,
+            (empresa, id_transaction, payment_type, payment_brand, amount, currency, batch_no, card_type, bin_card, last_4_digits,
+                holder, expiry_month, expiry_year, acquirer_code, client_type_id, client_name, client_last_name, client_id,
+                client_address,id_guia_servientrega))
+        # Insert into st_det_datafast
+        for product in cod_products:
+            cursor.execute(
+                """
+                INSERT INTO st_det_datafast (empresa, id_transaction, code, quantity)
+                VALUES (:1, :2, :3, :4)                                     
+                """, (empresa, id_transaction, product['code'], product['quantity'])
+            )
+            c.commit()
+        return True
+    except Exception as e:
+        c.rollback()
+        return str(e)
+    finally:
+        cursor.close()
+
+
+@web_services.route('/save_invoice/cf1/parts', methods=['POST'])
+def save_invoice_cf1_parts():
+    try:
+        data_invoice = json.loads(request.data)
+        empresa = 20  # for this Ws default 20 = massline
+        if not data_invoice:
+            return jsonify({"error": "No input data provided"}), 400
+
+        # validate received data
+        is_valid, error_message = validate_data1(data_invoice)
+        if not is_valid:
+            return jsonify({"error": "Missing data", "details": error_message}), 400
+    #-----------------------OPERATION --------------------------------------
+        flag_save_bill = save_data_bill_extended1(data_invoice, empresa)
+        if flag_save_bill == True:
+    #-----------------------------------------------------------------------
+            number = random.randint(1, 100)
+            message = f"F1-0653{number}"
+            return jsonify({"message": "Transaction completed successfully", "data": data_invoice, "order_code": message}), 200
+        else:
+            return jsonify({"error": flag_save_bill})
+    except Exception as e:
+        return str(e)
+def validate_data1(data):
+    # list of required fields at top level
+    required_fields = ['transactionId', 'internalTransactionReference', 'amount', 'currency', 'idGuiaServientrega']
+    # list of required fields at card and  client level
+    required_client_fields = ['name', 'lastName', 'clientId', 'address']
+
+    # Verify that all top levels fields are present and not empty
+    for field in required_fields:
+        if field not in data or data[field] in [None, '']:
+            return False, f"Missing or empty field: {field}"
+
+    # Verify that customer information is present and valid
+    if 'client' not in data:
+        return False, "Missing client data"
+
+    for field in required_client_fields:
+        if field not in data['client'] or data['client'][field] in [None, '']:
+            return False, f"Missing or empty field in client: {field}"
+    if 'cod_products' not in data:
+        return False, "Missing cod_products data"
+    cod_products = data['cod_products']
+    if isinstance(cod_products, list) and len(cod_products) > 0:  # verify that it is a list and not empty
+        pass
+    else:
+        return False, "Missing cod_products data"
+
+
+    return True, None
+def save_data_bill_extended1(data_invoice, empresa):
+    # Extrae datos del JSON
+    id_transaction = data_invoice['transactionId']
+    internal_transaction_reference = data_invoice['internalTransactionReference']
+    amount = data_invoice['amount']
+    currency = data_invoice['currency']
+    id_guia_servientrega = data_invoice['idGuiaServientrega']
+    client_type_id = data_invoice['client']['typeId']
+    client_name = data_invoice['client']['name']
+    client_last_name = data_invoice['client']['lastName']
+    client_id = data_invoice['client']['clientId']
+    client_address = data_invoice['client']['address']
+    cod_products = data_invoice['cod_products']
+
+    c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+    cursor = c.cursor()
+    try:
+        # Insert into st_cab_datafast
+        cursor.execute(
+        """ INSERT INTO st_cab_deuna (
+            empresa, id_transaction, internal_transaction_reference, amount, currency,id_guia_servientrega, client_type_id, client_name, client_last_name, client_id, client_address
+            ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11) """,
+            (empresa, id_transaction, internal_transaction_reference, amount, currency, id_guia_servientrega, client_type_id, client_name, client_last_name, client_id, client_address))
+        # Insert into st_det_datafast
+        for product in cod_products:
+            cursor.execute(
+                """
+                INSERT INTO st_det_deuna (empresa, id_transaction, code, quantity)
+                VALUES (:1, :2, :3, :4)                                     
+                """, (empresa, id_transaction, product['code'], product['quantity'])
+            )
+            c.commit()
+        return True
+    except Exception as e:
+        c.rollback()
+        return str(e)
+    finally:
+        cursor.close()
 
 ##-------------------------------------------------------------------------------------------
