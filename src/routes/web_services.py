@@ -1446,7 +1446,7 @@ def save_data_bill_extended(data_invoice, empresa):
     client_address = data_invoice['client']['address']
     cod_products = data_invoice['cod_products']
     id_guia_servientrega = data_invoice['idGuiaServientrega']
-
+    cotizacion_servientrega = data_invoice['cotizacionServientrega']
     c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
     cursor = c.cursor()
     try:
@@ -1455,11 +1455,11 @@ def save_data_bill_extended(data_invoice, empresa):
         """ INSERT INTO st_cab_datafast (
                 empresa, id_transaction, payment_type, payment_brand, amount, currency, batch_no,
                 card_type, bin_card, last_4_digits, holder, expiry_month, expiry_year,
-                acquirer_code, client_type_id, client_name, client_last_name, client_id, client_address,id_guia_servientrega 
-            ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17, :18, :19, :20) """,
+                acquirer_code, client_type_id, client_name, client_last_name, client_id, client_address,id_guia_servientrega,cost_shiping  
+            ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17, :18, :19, :20, :21) """,
             (empresa, id_transaction, payment_type, payment_brand, amount, currency, batch_no, card_type, bin_card, last_4_digits,
                 holder, expiry_month, expiry_year, acquirer_code, client_type_id, client_name, client_last_name, client_id,
-                client_address,id_guia_servientrega))
+                client_address,id_guia_servientrega, cotizacion_servientrega))
         # Insert into st_det_datafast
         for product in cod_products:
             cursor.execute(
@@ -1541,6 +1541,7 @@ def save_data_bill_extended1(data_invoice, empresa):
     client_id = data_invoice['client']['clientId']
     client_address = data_invoice['client']['address']
     cod_products = data_invoice['cod_products']
+    cotizacion_servientrega = data_invoice['cotizacionServientrega']
 
     c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
     cursor = c.cursor()
@@ -1548,9 +1549,9 @@ def save_data_bill_extended1(data_invoice, empresa):
         # Insert into st_cab_datafast
         cursor.execute(
         """ INSERT INTO st_cab_deuna (
-            empresa, id_transaction, internal_transaction_reference, amount, currency,id_guia_servientrega, client_type_id, client_name, client_last_name, client_id, client_address
-            ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11) """,
-            (empresa, id_transaction, internal_transaction_reference, amount, currency, id_guia_servientrega, client_type_id, client_name, client_last_name, client_id, client_address))
+            empresa, id_transaction, internal_transaction_reference, amount, currency,id_guia_servientrega, client_type_id, client_name, client_last_name, client_id, client_address,cost_shiping
+            ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12) """,
+            (empresa, id_transaction, internal_transaction_reference, amount, currency, id_guia_servientrega, client_type_id, client_name, client_last_name, client_id, client_address, cotizacion_servientrega))
         # Insert into st_det_datafast
         for product in cod_products:
             cursor.execute(
@@ -1567,4 +1568,4 @@ def save_data_bill_extended1(data_invoice, empresa):
     finally:
         cursor.close()
 
-##-------------------------------------------------------------------------------------------
+##---------------------------------------------------------------------------------
