@@ -1015,7 +1015,6 @@ def dropdown_despieces():
 
         list_brands = []
         for brand in brands:
-            print(brand)
             dict = {
                 "MARCA": brand[0],
                 "COD_MARCA": brand[1]
@@ -1048,7 +1047,7 @@ def dropdown_categories():
         categories = cursor.execute(sql, {"cod_despiece_padre": cod_despiece_padre}).fetchall()
         list_categories = []
         for category in categories:
-            if category[0] =='SGN' or category[0]=='BGN':
+            if category[0] =='SGN' or category[0]=='BGN' or category[0] =='SCU' or category[0] =='SLF' or category[0] =='BCR' or category[0] =='BPA' or category[0] =='BMO':
                 continue
             dict = {
                 "COD_CATEGORIA": category[0],
@@ -1063,6 +1062,35 @@ def dropdown_categories():
 @web_services.route('/modelos/dropdown', methods=['GET'])
 def dropdown_modelos():
     try:
+        # Lista de modelos permitidos
+        modelos_permitidos = [
+            "ARMY",
+            "XTREME 200",
+            "STEELER",
+            "XY250GY-6I",
+            "SMX-8",
+            "THOR",
+            "A-VENTURE",
+            "XY250-8 TITAN",
+            "XY300GY-13",
+            "CHIEF II",
+            "XY250-11",
+            "SPORT-II",
+            "XY200 GP",
+            "SPARTA 170",
+            "SPARTA 200",
+            "150-CS",
+            "GN STARK",
+            "XY150-10F",
+            "XY150-10D",
+            "CLASICA",
+            "XY125-30A",
+            "FREEDOM",
+            "JEDI",
+            "CITY-MAX",
+            "CROSSMAX-XY300-13"
+        ]
+
         cod_despiece_padre = request.args.get('cod_categoria')
         cod_despiece_padre = cod_despiece_padre.upper()
         c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
@@ -1070,24 +1098,24 @@ def dropdown_modelos():
         sql = """
             SELECT 
                     cod_despiece,
-                    nombre_e,
+                    nombre_i,
                     nivel,
                     cod_despiece_padre
-
             FROM st_despiece
             WHERE  empresa=20
             AND    nivel=3
             AND    cod_despiece_padre=:cod_despiece_padre
-                """
+        """
 
         categories = cursor.execute(sql, {"cod_despiece_padre": cod_despiece_padre}).fetchall()
         list_categories = []
         for category in categories:
-            dict = {
-                "COD_MODELO": category[0],
-                "MODELO": category[1]
-            }
-            list_categories.append(dict)
+            if category[1] in modelos_permitidos:
+                dict = {
+                    "COD_MODELO": category[0],
+                    "MODELO": category[1]
+                }
+                list_categories.append(dict)
         return jsonify(list_categories), 200
     except Exception as e:
         print(e)
