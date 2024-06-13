@@ -1088,7 +1088,11 @@ def dropdown_modelos():
             "FREEDOM",
             "JEDI",
             "CITY-MAX",
-            "CROSSMAX-XY300-13"
+            "CROSSMAX-XY300-13",
+            "FLASH S600",
+            "E-MAX 1500",
+            "AVATAR 1200",
+            "RAYO 500"
         ]
 
         cod_despiece_padre = request.args.get('cod_categoria')
@@ -1110,6 +1114,7 @@ def dropdown_modelos():
         categories = cursor.execute(sql, {"cod_despiece_padre": cod_despiece_padre}).fetchall()
         list_categories = []
         for category in categories:
+            print(category[1])
             if category[1] in modelos_permitidos:
                 dict = {
                     "COD_MODELO": category[0],
@@ -1320,7 +1325,7 @@ def get_data_clients(): #endPoint to get data from a client, it needs values: id
             and b.empresah                    =                         a.empresa
             and a.cod_tipo_identificacion     =                         :tipo_identificacion
             and a.cod_cliente                 =                         :cod_client
-            and b.cod_clienteh                 =                         a.cod_cliente       
+            and b.cod_clienteh                =                         a.cod_cliente       
             
                                                                   """, tipo_identificacion=type_id, empresa=empresa, cod_client=cod_client)
 
