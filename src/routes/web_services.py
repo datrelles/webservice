@@ -1114,7 +1114,7 @@ def dropdown_modelos():
         categories = cursor.execute(sql, {"cod_despiece_padre": cod_despiece_padre}).fetchall()
         list_categories = []
         for category in categories:
-            print(category[1], category[0])
+            #print(category[1], category[0])
             if category[1] in modelos_permitidos:
                 dict = {
                     "COD_MODELO": category[0],
