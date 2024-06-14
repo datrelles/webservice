@@ -412,7 +412,7 @@ def cargaMatriculas():
         data = request.get_json()
         print(data)
         anio = data.get('anio')
-        page_size = 1000
+        page_size = 300
         page_number = data.get('page', 1)
         offset = (page_number - 1) * page_size
         print(anio)
@@ -1088,7 +1088,7 @@ def dropdown_modelos():
             "FREEDOM",
             "JEDI",
             "CITY-MAX",
-            "CROSSMAX-XY300-13",
+            "CROSSMAX - XY300-13",
             "FLASH S600",
             "E-MAX 1500",
             "AVATAR 1200",
@@ -1114,7 +1114,7 @@ def dropdown_modelos():
         categories = cursor.execute(sql, {"cod_despiece_padre": cod_despiece_padre}).fetchall()
         list_categories = []
         for category in categories:
-            print(category[1])
+            print(category[1], category[0])
             if category[1] in modelos_permitidos:
                 dict = {
                     "COD_MODELO": category[0],
