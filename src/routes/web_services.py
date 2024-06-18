@@ -1114,7 +1114,6 @@ def dropdown_modelos():
         categories = cursor.execute(sql, {"cod_despiece_padre": cod_despiece_padre}).fetchall()
         list_categories = []
         for category in categories:
-            #print(category[1], category[0])
             if category[1] in modelos_permitidos:
                 dict = {
                     "COD_MODELO": category[0],
@@ -1229,6 +1228,8 @@ WHERE
     DP.EMPRESA = 20
     AND DP4.COD_DESPIECE NOT IN ('U', '1', 'L')
         """
+        valor_politica_ecommerce = get_politica_credito_ecommerce()
+        print(valor_politica_ecommerce)
         cursor.execute(sql)
         results = []
         for row in cursor.fetchall():
@@ -1255,7 +1256,7 @@ WHERE
                 'BODEGA': row[15],
                 'NOMBRE_BODEGA': row[16],
                 'COD_UNIDAD': row[17],
-                'PRECIO': row[18],
+                'PRECIO': round(row[18]*valor_politica_ecommerce,2),
                 'URL_IMAGE': imagen_url,
                 'PESO': row[19],
                 'ANIO_DESDE': row[20],
@@ -1267,6 +1268,39 @@ WHERE
     except Exception as e:
         print(e)
         return jsonify({'error': str(e)})
+
+
+def get_politica_credito_ecommerce():
+    try:
+        # Establece la conexión
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+
+        # Define y ejecuta la consulta SQL
+        sql = """
+                select factor_credito from st_politica_credito_d a
+                where a.num_cuotas=0
+                and   a.cod_politica=4
+        """
+        cursor.execute(sql)
+        rules_politica = cursor.fetchone()
+        if rules_politica:
+            result = rules_politica[0]
+        else:
+            # Si no hay resultado, asigna un valor por defecto o maneja el caso adecuadamente
+            result = None
+        return result
+    except cx_Oracle.DatabaseError as e:
+        print(f"Error de base de datos: {e}")
+    finally:
+        # Asegúrate de cerrar el cursor y la conexión
+        if cursor:
+            cursor.close()
+        if c:
+            c.close()
+
+
+
 @web_services.route('/checkStock', methods=['POST'])
 def check_stock(): #EndPoint to check stock before purchase
     try:
