@@ -1229,7 +1229,6 @@ WHERE
     AND DP4.COD_DESPIECE NOT IN ('U', '1', 'L')
         """
         valor_politica_ecommerce = get_politica_credito_ecommerce()
-        print(valor_politica_ecommerce)
         cursor.execute(sql)
         results = []
         for row in cursor.fetchall():
@@ -1268,8 +1267,6 @@ WHERE
     except Exception as e:
         print(e)
         return jsonify({'error': str(e)})
-
-
 def get_politica_credito_ecommerce():
     try:
         # Establece la conexión
@@ -1298,8 +1295,6 @@ def get_politica_credito_ecommerce():
             cursor.close()
         if c:
             c.close()
-
-
 
 @web_services.route('/checkStock', methods=['POST'])
 def check_stock(): #EndPoint to check stock before purchase
@@ -1634,5 +1629,133 @@ def save_data_bill_extended1(data_invoice, empresa):
         return str(e)
     finally:
         cursor.close()
+@web_services.route('/all_consigned_motorcycle', methods=['GET'])
+def all_consigned_motorcycle():
+    try:
+        # Conexión a la base de datos Oracle
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+
+        # Consulta SQL
+        sql = """
+        SELECT
+            cod_chasis, cod_motor, codigo, descripcion,
+            modelo, camvcpn, anio, color, marca,
+            cilindraje, tonelaje, ocupantes, clase,
+            subclase, pais_origen, cod_manual_garantia,
+            ruc_cliente 
+        FROM (
+            SELECT
+                a.cod_chasis, a.cod_motor, a.cod_producto codigo,
+                p.nombre descripcion, a.modelo, a.camvcpn camvcpn,
+                a.anio, l.nombre color, m.nombre marca,
+                a.cilindraje, a.tonelaje, a.ocupantes, a.clase,
+                a.subclase, a.pais_origen, b.cod_manual_garantia,
+                n.ruc_cliente
+            FROM
+                st_prod_packing_list a,
+                st_prod_packing_l_garantias b,
+                producto p,
+                st_color l,
+                vt_producto_serie_consigna n,
+                marca m
+            WHERE
+                a.cod_producto = b.cod_producto
+                AND a.empresa = b.empresa
+                AND a.cod_chasis = b.cod_chasis
+                AND a.cod_producto = p.cod_producto
+                AND a.empresa = p.empresa
+                AND a.cod_color = l.cod_color
+                AND a.cod_motor = n.cod_motor
+                AND a.cod_producto = n.cod_producto
+                AND a.empresa = n.empresa
+                AND (n.fecha_despacho > SYSDATE - 10 OR a.fecha_modificacion > SYSDATE - 10)
+                AND a.empresa = 20
+                AND p.empresa = m.empresa
+                AND p.cod_marca = m.cod_marca
+            UNION
+            SELECT
+                a.cod_chasis, a.cod_motor, a.cod_producto codigo,
+                p.nombre descripcion, a.modelo, a.camvcpn camvcpn,
+                a.anio, l.nombre color, m.nombre marca,
+                a.cilindraje, a.tonelaje, a.ocupantes, a.clase,
+                a.subclase, a.pais_origen, b.cod_manual_garantia,
+                com.cod_persona
+            FROM
+                st_prod_packing_list a,
+                st_prod_packing_l_garantias b,
+                producto p,
+                st_color l,
+                st_serie_movimiento n,
+                comprobante com,
+                marca m
+            WHERE
+                a.cod_producto = b.cod_producto
+                AND a.empresa = b.empresa
+                AND a.cod_chasis = b.cod_chasis
+                AND a.cod_producto = p.cod_producto
+                AND a.empresa = p.empresa
+                AND a.cod_color = l.cod_color
+                AND a.cod_motor = n.numero_serie
+                AND a.cod_producto = n.cod_producto
+                AND a.empresa = n.empresa
+                AND com.tipo_comprobante = 'A0'
+                AND n.empresa = com.empresa
+                AND n.tipo_comprobante = com.tipo_comprobante
+                AND n.cod_comprobante = com.cod_comprobante
+                AND (com.fecha > SYSDATE - 10 OR a.fecha_modificacion > SYSDATE - 10)
+                AND a.empresa = 20
+                AND p.empresa = m.empresa
+                AND p.cod_marca = m.cod_marca
+                AND com.anulado = 'N'
+                AND NOT EXISTS (
+                    SELECT '+'
+                    FROM st_producto_serie_consigna co
+                    WHERE a.cod_motor = co.numero_serie
+                      AND a.cod_producto = co.cod_producto
+                      AND a.empresa = co.empresa
+                )
+                AND NOT EXISTS (
+                    SELECT '+'
+                    FROM st_comprobante_comprobante cc, st_serie_movimiento sm
+                    WHERE cc.cod_comprobante_s = sm.cod_comprobante
+                      AND cc.tipo_comprobante_s = sm.tipo_comprobante
+                      AND cc.empresa_s = sm.empresa
+                      AND sm.numero_serie = n.numero_serie
+                      AND com.cod_comprobante = cc.cod_comprobante
+                      AND com.tipo_comprobante = cc.tipo_comprobante
+                      AND com.empresa = cc.empresa
+                      AND cc.tipo_comprobante_s = 'D0'
+                )
+        )"""
+
+        cursor.execute(sql)
+        results = []
+        for row in cursor.fetchall():
+            result_dict = {
+                'cod_chasis': row[0],
+                'cod_motor': row[1],
+                'codigo': row[2],
+                'descripcion': row[3],
+                'modelo': row[4],
+                'camvcpn': row[5],
+                'anio': row[6],
+                'color': row[7],
+                'marca': row[8],
+                'cilindraje': row[9],
+                'tonelaje': row[10],
+                'ocupantes': row[11],
+                'clase': row[12],
+                'subclase': row[13],
+                'pais_origen': row[14],
+                'cod_manual_garantia': row[15],
+                'ruc_cliente': row[16]
+            }
+            results.append(result_dict)
+
+        return jsonify(results)
+
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 ##---------------------------------------------------------------------------------
