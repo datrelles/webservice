@@ -1441,11 +1441,12 @@ def checkJsonData_json(json_data):
     else:
         return False
 
+
 @web_services.route('/save_invoice/cf/parts', methods=['POST'])
 def save_invoice_cf_parts():
     try:
         data_invoice = json.loads(request.data)
-        empresa = 20  # for this Ws default 20 = massline
+        empresa = 20  # for this WS default 20 = massline
         if not data_invoice:
             return jsonify({"error": "No input data provided"}), 400
 
@@ -1453,20 +1454,23 @@ def save_invoice_cf_parts():
         is_valid, error_message = validate_data(data_invoice)
         if not is_valid:
             return jsonify({"error": "Missing data", "details": error_message}), 400
-    #-----------------------OPERATION --------------------------------------
+
+        # -----------------------OPERATION --------------------------------------
         flag_save_bill = save_data_bill_extended(data_invoice, empresa)
-        if flag_save_bill==True:
-    #-----------------------------------------------------------------------
+        if flag_save_bill == True:
+            # -----------------------------------------------------------------------
             number = random.randint(1, 100)
             message = f"F1-0653{number}"
-            return jsonify({"message": "Transaction completed successfully", "data": data_invoice, "order_code": message}), 200
+            return jsonify(
+                {"message": "Transaction completed successfully", "data": data_invoice, "order_code": message}), 200
         else:
             return jsonify({"error": flag_save_bill})
     except Exception as e:
         return str(e)
 def validate_data(data):
     # Lista de campos obligatorios a nivel superior
-    required_fields = ['id', 'paymentType', 'paymentBrand', 'amount', 'currency', 'batchNo']
+    required_fields = ['id', 'paymentType', 'paymentBrand', 'total', 'subTotal', 'discountPercentage', 'discountAmount',
+                       'currency', 'batchNo']
     # Lista de campos obligatorios para la tarjeta y el cliente
     required_card_fields = ['cardType', 'bin', 'last4Digits', 'holder', 'expiryMonth', 'expiryYear', 'acquirerCode']
     required_client_fields = ['name', 'lastName', 'clientId', 'address']
@@ -1486,10 +1490,10 @@ def validate_data(data):
     # Verificar que la información del cliente esté presente y sea válida
     if 'client' not in data:
         return False, "Missing client data"
-
     for field in required_client_fields:
         if field not in data['client'] or data['client'][field] in [None, '']:
             return False, f"Missing or empty field in client: {field}"
+
     if 'cod_products' not in data:
         return False, "Missing cod_products data"
     cod_products = data['cod_products']
@@ -1498,14 +1502,16 @@ def validate_data(data):
     else:
         return False, "Missing cod_products data"
 
-
     return True, None
 def save_data_bill_extended(data_invoice, empresa):
     # Extrae datos del JSON
     id_transaction = data_invoice['id']
     payment_type = data_invoice['paymentType']
     payment_brand = data_invoice['paymentBrand']
-    amount = data_invoice['amount']
+    total = data_invoice['total']
+    sub_total = data_invoice['subTotal']
+    discount_percentage = data_invoice['discountPercentage']
+    discount_amount = data_invoice['discountAmount']
     currency = data_invoice['currency']
     batch_no = data_invoice['batchNo']
     card_type = data_invoice['card']['cardType']
@@ -1522,27 +1528,33 @@ def save_data_bill_extended(data_invoice, empresa):
     client_address = data_invoice['client']['address']
     cod_products = data_invoice['cod_products']
     id_guia_servientrega = data_invoice['idGuiaServientrega']
-    cotizacion_servientrega = data_invoice['cotizacionServientrega']
+    cost_shiping_calculate = data_invoice['costShipingCalculate']
+    shiping_discount = data_invoice['shipingDiscount']
+
     c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
     cursor = c.cursor()
     try:
         # Insert into st_cab_datafast
         cursor.execute(
-        """ INSERT INTO st_cab_datafast (
-                empresa, id_transaction, payment_type, payment_brand, amount, currency, batch_no,
-                card_type, bin_card, last_4_digits, holder, expiry_month, expiry_year,
-                acquirer_code, client_type_id, client_name, client_last_name, client_id, client_address,id_guia_servientrega,cost_shiping  
-            ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17, :18, :19, :20, :21) """,
-            (empresa, id_transaction, payment_type, payment_brand, amount, currency, batch_no, card_type, bin_card, last_4_digits,
-                holder, expiry_month, expiry_year, acquirer_code, client_type_id, client_name, client_last_name, client_id,
-                client_address,id_guia_servientrega, cotizacion_servientrega))
+            """ INSERT INTO st_cab_datafast (
+                    empresa, id_transaction, payment_type, payment_brand, total, sub_total, discount_percentage, discount_amount, currency, batch_no,
+                    id_guia_servientrega, card_type, bin_card, last_4_digits, holder, expiry_month, expiry_year,
+                    acquirer_code, client_type_id, client_name, client_last_name, client_id, client_address,
+                    cost_shiping_calculate, shiping_discount
+                ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17, :18, :19, :20, :21, :22, :23, :24, :25) """,
+            (empresa, id_transaction, payment_type, payment_brand, total, sub_total, discount_percentage,
+             discount_amount, currency, batch_no,
+             id_guia_servientrega, card_type, bin_card, last_4_digits, holder, expiry_month, expiry_year, acquirer_code,
+             client_type_id,
+             client_name, client_last_name, client_id, client_address, cost_shiping_calculate, shiping_discount))
+
         # Insert into st_det_datafast
         for product in cod_products:
             cursor.execute(
                 """
-                INSERT INTO st_det_datafast (empresa, id_transaction, code, quantity)
-                VALUES (:1, :2, :3, :4)                                     
-                """, (empresa, id_transaction, product['code'], product['quantity'])
+                INSERT INTO st_det_datafast (empresa, id_transaction, cod_producto, price, quantity)
+                VALUES (:1, :2, :3, :4, :5)                                     
+                """, (empresa, id_transaction, product['codProducto'], product['price'], product['quantity'])
             )
             c.commit()
         return True
@@ -1552,12 +1564,11 @@ def save_data_bill_extended(data_invoice, empresa):
     finally:
         cursor.close()
 
-
 @web_services.route('/save_invoice/cf1/parts', methods=['POST'])
 def save_invoice_cf1_parts():
     try:
         data_invoice = json.loads(request.data)
-        empresa = 20  # for this Ws default 20 = massline
+        empresa = 20  # for this WS default 20 = massline
         if not data_invoice:
             return jsonify({"error": "No input data provided"}), 400
 
@@ -1565,10 +1576,10 @@ def save_invoice_cf1_parts():
         is_valid, error_message = validate_data1(data_invoice)
         if not is_valid:
             return jsonify({"error": "Missing data", "details": error_message}), 400
-    #-----------------------OPERATION --------------------------------------
+        #-----------------------OPERATION --------------------------------------
         flag_save_bill = save_data_bill_extended1(data_invoice, empresa)
         if flag_save_bill == True:
-    #-----------------------------------------------------------------------
+            #-----------------------------------------------------------------------
             number = random.randint(1, 100)
             message = f"F1-0653{number}"
             return jsonify({"message": "Transaction completed successfully", "data": data_invoice, "order_code": message}), 200
@@ -1578,8 +1589,8 @@ def save_invoice_cf1_parts():
         return str(e)
 def validate_data1(data):
     # list of required fields at top level
-    required_fields = ['transactionId', 'internalTransactionReference', 'amount', 'currency', 'idGuiaServientrega']
-    # list of required fields at card and  client level
+    required_fields = ['transactionId', 'internalTransactionReference', 'total', 'subTotal', 'discountPercentage', 'discountAmount', 'currency', 'idGuiaServientrega']
+    # list of required fields at client level
     required_client_fields = ['name', 'lastName', 'clientId', 'address']
 
     # Verify that all top levels fields are present and not empty
@@ -1594,6 +1605,7 @@ def validate_data1(data):
     for field in required_client_fields:
         if field not in data['client'] or data['client'][field] in [None, '']:
             return False, f"Missing or empty field in client: {field}"
+
     if 'cod_products' not in data:
         return False, "Missing cod_products data"
     cod_products = data['cod_products']
@@ -1602,13 +1614,15 @@ def validate_data1(data):
     else:
         return False, "Missing cod_products data"
 
-
     return True, None
 def save_data_bill_extended1(data_invoice, empresa):
     # Extrae datos del JSON
     id_transaction = data_invoice['transactionId']
     internal_transaction_reference = data_invoice['internalTransactionReference']
-    amount = data_invoice['amount']
+    total = data_invoice['total']
+    sub_total = data_invoice['subTotal']
+    discount_percentage = data_invoice['discountPercentage']
+    discount_amount = data_invoice['discountAmount']
     currency = data_invoice['currency']
     id_guia_servientrega = data_invoice['idGuiaServientrega']
     client_type_id = data_invoice['client']['typeId']
@@ -1616,25 +1630,28 @@ def save_data_bill_extended1(data_invoice, empresa):
     client_last_name = data_invoice['client']['lastName']
     client_id = data_invoice['client']['clientId']
     client_address = data_invoice['client']['address']
+    cost_shiping = data_invoice['costShipingCalculate']
     cod_products = data_invoice['cod_products']
-    cotizacion_servientrega = data_invoice['cotizacionServientrega']
 
     c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
     cursor = c.cursor()
     try:
-        # Insert into st_cab_datafast
+        # Insert into st_cab_deuna
         cursor.execute(
-        """ INSERT INTO st_cab_deuna (
-            empresa, id_transaction, internal_transaction_reference, amount, currency,id_guia_servientrega, client_type_id, client_name, client_last_name, client_id, client_address,cost_shiping
-            ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12) """,
-            (empresa, id_transaction, internal_transaction_reference, amount, currency, id_guia_servientrega, client_type_id, client_name, client_last_name, client_id, client_address, cotizacion_servientrega))
-        # Insert into st_det_datafast
+            """ INSERT INTO st_cab_deuna (
+                empresa, id_transaction, internal_transaction_reference, total, sub_total, discount_percentage, discount_amount, currency, id_guia_servientrega,
+                client_type_id, client_name, client_last_name, client_id, client_address, cost_shiping
+            ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15) """,
+            (empresa, id_transaction, internal_transaction_reference, total, sub_total, discount_percentage, discount_amount, currency,
+             id_guia_servientrega, client_type_id, client_name, client_last_name, client_id, client_address, cost_shiping))
+
+        # Insert into st_det_deuna
         for product in cod_products:
             cursor.execute(
                 """
-                INSERT INTO st_det_deuna (empresa, id_transaction, code, quantity)
-                VALUES (:1, :2, :3, :4)                                     
-                """, (empresa, id_transaction, product['code'], product['quantity'])
+                INSERT INTO st_det_deuna (empresa, id_transaction, cod_producto, price, quantity)
+                VALUES (:1, :2, :3, :4, :5)                                     
+                """, (empresa, id_transaction, product['codProducto'], product['price'], product['quantity'])
             )
             c.commit()
         return True
@@ -1643,6 +1660,7 @@ def save_data_bill_extended1(data_invoice, empresa):
         return str(e)
     finally:
         cursor.close()
+
 @web_services.route('/all_consigned_motorcycle', methods=['GET'])
 def all_consigned_motorcycle():
     try:
