@@ -1187,7 +1187,7 @@ def get_all_parts():
         c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
         cursor = c.cursor()
         sql = """
-      SELECT 
+          SELECT
     D.COD_PRODUCTO,
     P.NOMBRE AS NOMBRE_PRODUCTO,
     P.IVA,
@@ -1210,7 +1210,7 @@ def get_all_parts():
     P.VOLUMEN AS PESO,
     COALESCE(RPA.ANIO_DESDE, NULL) AS FROM_YEAR,
     COALESCE(RPA.ANIO_HASTA, NULL) AS TO_YEAR
-FROM 
+FROM
     ST_PRODUCTO_DESPIECE D
     JOIN ST_DESPIECE DP ON D.COD_DESPIECE = DP.COD_DESPIECE AND D.EMPRESA = DP.EMPRESA
     JOIN PRODUCTO P ON P.EMPRESA = D.EMPRESA AND D.COD_PRODUCTO = P.COD_PRODUCTO
@@ -1224,9 +1224,23 @@ FROM
     JOIN BODEGA B ON B.EMPRESA = L.EMPRESA AND B.BODEGA = L.COD_AGENCIA
     JOIN ST_MATERIAL_IMAGEN IM ON IM.COD_TIPO_MATERIAL = 'PRO' AND IM.COD_MATERIAL = P.COD_PRODUCTO AND IM.EMPRESA = P.EMPRESA
     LEFT JOIN ST_PRODUCTO_REP_ANIO RPA ON RPA.EMPRESA = MI.EMPRESA AND RPA.COD_PRODUCTO = P.COD_PRODUCTO
-WHERE 
+WHERE
     DP.EMPRESA = 20
-    AND DP4.COD_DESPIECE NOT IN ('U', '1', 'L')
+    --AND DP4.COD_DESPIECE NOT IN ('U', '1', 'L')
+    --AND L.COD_AGENCIA = 50
+    --AND B.BODEGA = 50
+    AND
+    (SELECT KS_INVENTARIO.consulta_existencia(
+                        DP.EMPRESA,
+                        L.COD_AGENCIA,
+                        P.COD_PRODUCTO,
+                        'U',
+                        TO_DATE(SYSDATE, 'YYYY/MM/DD'),
+                        1,
+                        'Z',
+                        1
+                    )
+                    FROM dual)>0
         """
         valor_politica_ecommerce = get_politica_credito_ecommerce()
         cursor.execute(sql)
@@ -1301,7 +1315,7 @@ def check_stock(): #EndPoint to check stock before purchase
     try:
         # Get the parameters from the request.
         empresa = 20    #default Massline
-        agencia = 10    #The Ecommerce agency's code
+        agencia = 50    #The Ecommerce agency's code
         data = request.get_json()
         db = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
         cursor = db.cursor()
