@@ -423,7 +423,7 @@ def cargaMatriculas():
         sql = """SELECT CAMVCPN
                  FROM (
                      SELECT CAMVCPN, ROW_NUMBER() OVER (ORDER BY CAMVCPN) AS r
-                     FROM vt_vta_consigna_motos
+                     FROM vt_vta_consigna_motos_rep
                  )
                  WHERE r BETWEEN :offset + 1 AND :offset + :page_size"""
 
