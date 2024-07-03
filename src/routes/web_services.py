@@ -1631,8 +1631,8 @@ def save_data_bill_extended1(data_invoice, empresa):
     client_id = data_invoice['client']['clientId']
     client_address = data_invoice['client']['address']
     cost_shiping = data_invoice['costShipingCalculate']
+    shiping_discount = data_invoice['shipingDiscount']
     cod_products = data_invoice['cod_products']
-
     c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
     cursor = c.cursor()
     try:
@@ -1640,10 +1640,10 @@ def save_data_bill_extended1(data_invoice, empresa):
         cursor.execute(
             """ INSERT INTO st_cab_deuna (
                 empresa, id_transaction, internal_transaction_reference, total, sub_total, discount_percentage, discount_amount, currency, id_guia_servientrega,
-                client_type_id, client_name, client_last_name, client_id, client_address, cost_shiping
-            ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15) """,
+                client_type_id, client_name, client_last_name, client_id, client_address, cost_shiping, shiping_discount
+            ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16) """,
             (empresa, id_transaction, internal_transaction_reference, total, sub_total, discount_percentage, discount_amount, currency,
-             id_guia_servientrega, client_type_id, client_name, client_last_name, client_id, client_address, cost_shiping))
+             id_guia_servientrega, client_type_id, client_name, client_last_name, client_id, client_address, cost_shiping,  shiping_discount))
 
         # Insert into st_det_deuna
         for product in cod_products:
