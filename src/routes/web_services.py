@@ -1441,7 +1441,6 @@ def checkJsonData_json(json_data):
     else:
         return False
 
-
 @web_services.route('/save_invoice/cf/parts', methods=['POST'])
 def save_invoice_cf_parts():
     try:
@@ -1789,5 +1788,56 @@ def all_consigned_motorcycle():
 
     except Exception as e:
         return jsonify({'error': str(e)})
+
+@web_services.route('/get_all_ruc_b2b_customer', methods=['GET'] )
+def get_all_ruc_b2b_customer():
+    try:
+        empresa = 20  # default Massline
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+        cursor.execute("""
+                select b.activoh, b.cod_tipo_clienteh, a.cod_cliente, a.nombre, a.apellido1, b.direccion_calleh, b.celular, b.email_factura 
+                from cliente a, cliente_hor b 
+                WHERE a.empresa = :empresa
+                and b.empresah = a.empresa
+                and b.cod_tipo_clienteh IN ('DI', 'DM', 'TA')
+                and b.cod_clienteh = a.cod_cliente
+            """, empresa=empresa)
+
+        clients = cursor.fetchall()
+        data_clients = []
+        for client in clients:
+            ruc = client[2].replace("-", "") if client[2] is not None else ''
+
+            # Consulta adicional para obtener las direcciones
+            cursor.execute("""
+                    select a.descripcion, a.direccion 
+                    from ar_taller_servicio_tecnico a 
+                    where a.ruc = :ruc
+                """, ruc=ruc)
+
+            additional_addresses = cursor.fetchall()
+            addresses = [client[5] if client[5] is not None else '']
+            for address in additional_addresses:
+                addresses.append(f"{address[0]}: {address[1]}")
+
+            data_clients.append({
+                'activo': client[0] if client[0] is not None else '',
+                'tipo_cliente': client[1] if client[1] is not None else '',
+                'id': ruc,
+                'nombres': client[3] if client[3] is not None else '',
+                'apellidos': client[4] if client[4] is not None else '',
+                'direcciones': addresses,
+                'celular': client[6] if client[6] is not None else '',
+                'email': client[7] if client[7] is not None else ''
+            })
+
+        c.close()
+        return jsonify({'clientes': data_clients}), 200
+    except Exception as e:
+        print(e)
+        return str(e), 500
+
+
 
 ##---------------------------------------------------------------------------------
