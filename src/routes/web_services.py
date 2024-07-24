@@ -1802,56 +1802,10 @@ def stock_available():
             return jsonify(
                 {"error": "Se requieren ambos parámetros 'PEDIDO EXTERNO(code)' Y 'RUC (id)' en la solicitud."}), 400
         sql = """
-                SELECT X.COD_PRODUCTO, X.DESCRIPCION, TRUNC(S.PORCENTAJE_MAXIMO*X.INV/100) as cupo
-                FROM ST_ASIGNACION_CUPO S,
-                (SELECT COD_PRODUCTO, DESCRIPCION, COUNT(NUMERO_SERIE) AS INV
-                FROM 
-                (SELECT v.COD_PRODUCTO, v.DESCRIPCION, v.NUMERO_SERIE
-                  FROM vt_inventario_serie_disp v
-                 WHERE V.COD_PRODUCTO_MODELO IS NOT NULL AND EXISTS
-                 (SELECT *
-                          FROM STA_MOVIMIENTO M
-                         WHERE M.EMPRESA = v.EMPRESA
-                           AND M.COD_PRODUCTO = v.COD_PRODUCTO
-                           AND M.ES_SERIE = 1)
-                           AND cod_estado_PRODUCTO IN ('A', 'G')
-                UNION
-                SELECT v.COD_PRODUCTO, v.DESCRIPCION, v.NUMERO_SERIE
-                  FROM vt_inventario_sin_bat v
-                 WHERE v.COD_PRODUCTO in
-                 (select A.COD_PRODUCTO_INSUMO
-                    
-                    from ST_PROD_FORMULA_D A, ST_PROD_FORMULA B
-                   WHERE B.EMPRESA=20
-                     AND A.COD_FORMULA=B.COD_FORMULA
-                     AND A.COD_TIPO_FORMULA=B.COD_TIPO_FORMULA
-                     AND A.EMPRESA=B.EMPRESA
-                     AND A.ES_MOTOR=1)
-                     and
-                    v.COD_BODEGA = 5
-                   AND EXISTS
-                 (SELECT *
-                          FROM ST_PROD_FORMULA_D B
-                         WHERE V.cod_producto = B.COD_PRODUCTO_INSUMO
-                           AND V.empresa = B.EMPRESA
-                           AND B.ES_MOTOR = 1)
-                   AND EXISTS
-                 (SELECT *
-                          FROM ST_PROD_FORMULA_D B, ST_PROD_FORMULA C, STA_MOVIMIENTO D
-                         WHERE V.cod_producto = B.COD_PRODUCTO_INSUMO
-                           AND V.empresa = B.EMPRESA
-                           AND B.ES_MOTOR = 1
-                           AND B.EMPRESA = C.EMPRESA
-                           AND B.COD_FORMULA = C.COD_FORMULA
-                           AND B.COD_TIPO_FORMULA = C.COD_TIPO_FORMULA
-                           AND C.EMPRESA = D.EMPRESA
-                           AND C.COD_PRODUCTO_TERMINADO = D.COD_PRODUCTO))
-                           GROUP BY COD_PRODUCTO, DESCRIPCION) X
-                WHERE X.COD_PRODUCTO = S.COD_PRODUCTO
-                AND TRUNC(S.PORCENTAJE_MAXIMO * X.INV / 100) > S.cantidad_minima
-                AND S.RUC_CLIENTE = :id"""
+                SELECT * FROM VT_ASIGNACION_CUPO V 
+                """
 
-        cursor = cur_01.execute(sql, [id])
+        cursor = cur_01.execute(sql)
         c.close
         row_headers = [x[0] for x in cursor.description]
         array = cursor.fetchall()
