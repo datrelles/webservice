@@ -1802,10 +1802,11 @@ def stock_available():
             return jsonify(
                 {"error": "Se requieren ambos parámetros 'PEDIDO EXTERNO(code)' Y 'RUC (id)' en la solicitud."}), 400
         sql = """
-                SELECT * FROM VT_ASIGNACION_CUPO V 
+                SELECT * FROM VT_ASIGNACION_CUPO V
+                WHERE V.RUC_CLIENTE = :id 
                 """
 
-        cursor = cur_01.execute(sql)
+        cursor = cur_01.execute(sql, [id])
         c.close
         row_headers = [x[0] for x in cursor.description]
         array = cursor.fetchall()
