@@ -1441,7 +1441,6 @@ def checkJsonData_json(json_data):
     else:
         return False
 
-
 @web_services.route('/save_invoice/cf/parts', methods=['POST'])
 def save_invoice_cf_parts():
     try:
@@ -1790,6 +1789,155 @@ def all_consigned_motorcycle():
     except Exception as e:
         return jsonify({'error': str(e)})
 
+@web_services.route('/get_all_ruc_b2b_customer', methods=['GET'] )
+def get_all_ruc_b2b_customer():
+    try:
+        empresa = 20  # default Massline
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+        cursor.execute("""
+                select b.activoh, b.cod_tipo_clienteh, a.cod_cliente, a.nombre, a.apellido1, b.direccion_calleh, b.celular, b.email_factura 
+                from cliente a, cliente_hor b 
+                WHERE a.empresa = :empresa
+                and b.empresah = a.empresa
+                and b.cod_tipo_clienteh IN ('DI', 'DM', 'TA')
+                and b.cod_clienteh = a.cod_cliente
+            """, empresa=empresa)
+
+        clients = cursor.fetchall()
+        data_clients = []
+        for client in clients:
+            ruc = client[2].replace("-", "") if client[2] is not None else ''
+
+            # Consulta adicional para obtener las direcciones
+            cursor.execute("""
+                    select a.descripcion, a.direccion 
+                    from ar_taller_servicio_tecnico a 
+                    where a.ruc = :ruc
+                """, ruc=ruc)
+
+            additional_addresses = cursor.fetchall()
+            addresses = [client[5] if client[5] is not None else '']
+            for address in additional_addresses:
+                addresses.append(f"{address[0]}: {address[1]}")
+
+            data_clients.append({
+                'activo': client[0] if client[0] is not None else '',
+                'tipo_cliente': client[1] if client[1] is not None else '',
+                'id': ruc,
+                'nombres': client[3] if client[3] is not None else '',
+                'apellidos': client[4] if client[4] is not None else '',
+                'direcciones': addresses,
+                'celular': client[6] if client[6] is not None else '',
+                'email': client[7] if client[7] is not None else ''
+            })
+
+        c.close()
+        return jsonify({'clientes': data_clients}), 200
+    except Exception as e:
+        print(e)
+        return str(e), 500
+@web_services.route('/all_parts_b2b', methods=['GET'])
+def get_all_parts_b2b():
+    try:
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+        sql = """
+   SELECT
+    D.COD_PRODUCTO,
+    P.NOMBRE AS NOMBRE_PRODUCTO,
+    P.IVA,
+    P.ICE,
+    C.nombre color,
+    BUF.ES_BUFFER AS CONTROL_BUFFER,
+    DP.COD_DESPIECE_PADRE AS CODIGO_MODELO_MOTO,
+    DP2.NOMBRE_E AS MOTO_MODELO,
+    MI.NOMBRE AS NOMBRE_SUBSISTEMA,
+    MI.COD_ITEM AS CODIGO_SUBSISTEMA,
+    DP2.COD_DESPIECE_PADRE AS CODIGO_CATEGORIA,
+    DP3.NOMBRE_E AS NOMBRE_CATEGORIA,
+    DP4.NOMBRE_E AS NOMBRE_MARCA,
+    DP4.COD_DESPIECE AS CODIGO_MARCA,
+    L.COD_AGENCIA,
+    B.BODEGA,
+    B.NOMBRE AS NOMBRE_BODEGA,
+    L.COD_UNIDAD,
+    L.PRECIO,
+    P.VOLUMEN AS PESO,
+    COALESCE(RPA.ANIO_DESDE, NULL) AS FROM_YEAR,
+    COALESCE(RPA.ANIO_HASTA, NULL) AS TO_YEAR
+FROM
+    ST_PRODUCTO_DESPIECE D
+    JOIN ST_DESPIECE DP ON D.COD_DESPIECE = DP.COD_DESPIECE AND D.EMPRESA = DP.EMPRESA
+    JOIN PRODUCTO P ON P.EMPRESA = D.EMPRESA AND D.COD_PRODUCTO = P.COD_PRODUCTO
+    JOIN TG_MODELO_ITEM MI ON MI.EMPRESA = P.EMPRESA AND P.COD_MODELO_CAT1 = MI.COD_MODELO AND P.COD_ITEM_CAT1 = MI.COD_ITEM
+    JOIN ST_DESPIECE DP2 ON DP2.EMPRESA = D.EMPRESA AND DP.COD_DESPIECE_PADRE = DP2.COD_DESPIECE
+    JOIN ST_DESPIECE DP3 ON DP3.EMPRESA = DP2.EMPRESA AND DP2.COD_DESPIECE_PADRE = DP3.COD_DESPIECE
+    JOIN ST_DESPIECE DP4 ON DP4.EMPRESA = DP3.EMPRESA AND DP3.COD_DESPIECE_PADRE = DP4.COD_DESPIECE
+    JOIN ST_COLOR C ON C.COD_COLOR = P.PARTIDA
+    JOIN ST_PRODUCTO_BUFFER BUF ON BUF.COD_PRODUCTO = P.COD_PRODUCTO AND BUF.EMPRESA = P.EMPRESA
+    JOIN ST_LISTA_PRECIO L ON L.COD_PRODUCTO = P.COD_PRODUCTO AND L.COD_AGENCIA = 50 AND L.COD_UNIDAD = P.COD_UNIDAD AND L.COD_FORMA_PAGO = 'EFE' AND L.COD_DIVISA = 'DOLARES' AND L.COD_MODELO_CLI = 'CLI1' AND L.COD_ITEM_CLI = 'CF' AND L.ESTADO_GENERACION = 'R' AND (L.FECHA_FINAL IS NULL OR L.FECHA_FINAL >= TRUNC(SYSDATE))
+    JOIN BODEGA B ON B.EMPRESA = L.EMPRESA AND B.BODEGA = L.COD_AGENCIA
+    JOIN ST_MATERIAL_IMAGEN IM ON IM.COD_TIPO_MATERIAL = 'PRO' AND IM.COD_MATERIAL = P.COD_PRODUCTO AND IM.EMPRESA = P.EMPRESA
+    LEFT JOIN ST_PRODUCTO_REP_ANIO RPA ON RPA.EMPRESA = MI.EMPRESA AND RPA.COD_PRODUCTO = P.COD_PRODUCTO
+WHERE
+    DP.EMPRESA = 20
+    AND EXISTS (
+        SELECT 1
+        FROM ST_FORMULA F
+        WHERE F.EMPRESA = DP.EMPRESA
+          AND F.COD_PRODUCTO = P.COD_PRODUCTO
+    )
+    AND (SELECT KS_INVENTARIO.consulta_existencia(
+                        DP.EMPRESA,
+                        L.COD_AGENCIA,
+                        P.COD_PRODUCTO,
+                        'U',
+                        TO_DATE(SYSDATE, 'YYYY/MM/DD'),
+                        1,
+                        'Z',
+                        1
+                    )
+                    FROM dual) > 0
+
+        """
+        valor_politica_ecommerce = get_politica_credito_ecommerce()
+        cursor.execute(sql)
+        results = []
+        for row in cursor.fetchall():
+            #host = '192.168.30.8:5000'
+            host = '200.105.245.182:5000'
+            result_dict = {
+                'COD_PRODUCTO': row[0],
+                'NOMBRE_PRODUCTO': row[1],
+                'IVA': row[2],
+                'ICE': row[3],
+                'COLOR': row[4],
+                'CONTROL_BUFFER': row[5],
+                'CODIGO_MODELO_MOTO': row[6],
+                'MOTO_MODELO': row[7],
+                'NOMBRE_SUBSISTEMA': row[8],
+                'CODIGO_SUBSISTEMA': row[9],
+                'CODIGO_CATEGORIA': row[10],
+                'NOMBRE_CATEGORIA': row[11],
+                'NOMBRE_MARCA': row[12],
+                'CODIGO_MARCA': row[13],
+                'COD_AGENCIA': row[14],
+                'BODEGA': row[15],
+                'NOMBRE_BODEGA': row[16],
+                'COD_UNIDAD': row[17],
+                'PRECIO': round(row[18]*valor_politica_ecommerce,2),
+                'PESO': row[19],
+                'ANIO_DESDE': row[20],
+                'ANIO_HASTA': row[21]
+            }
+            results.append(result_dict)
+        return jsonify(results)
+
+    except Exception as e:
+        print(e)
+        return jsonify({'error': str(e)})
+
 ##---------------------------------------------------------------------------------WEB SERVER DE CONSULTA DE INVENTARIO JAHER-------------------------------------------------------------
 
 @web_services.route("/stock_available", methods=["GET"])
@@ -1800,7 +1948,7 @@ def stock_available():
         id = request.args.get('id', None)
         if id is None:
             return jsonify(
-                {"error": "Se requieren ambos parámetros 'PEDIDO EXTERNO(code)' Y 'RUC (id)' en la solicitud."}), 400
+                {"error": "Se requieren ambos parámetros ID/RUC de cliente."}), 400
         sql = """
                 SELECT * FROM VT_ASIGNACION_CUPO V
                 WHERE V.RUC_CLIENTE = :id 
@@ -1818,3 +1966,4 @@ def stock_available():
     except Exception as ex:
         raise Exception(ex)
     return response_body
+
