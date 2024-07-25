@@ -1837,7 +1837,134 @@ def get_all_ruc_b2b_customer():
     except Exception as e:
         print(e)
         return str(e), 500
+@web_services.route('/all_parts_b2b', methods=['GET'])
+def get_all_parts_b2b():
+    try:
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+        sql = """
+   SELECT
+    D.COD_PRODUCTO,
+    P.NOMBRE AS NOMBRE_PRODUCTO,
+    P.IVA,
+    P.ICE,
+    C.nombre color,
+    BUF.ES_BUFFER AS CONTROL_BUFFER,
+    DP.COD_DESPIECE_PADRE AS CODIGO_MODELO_MOTO,
+    DP2.NOMBRE_E AS MOTO_MODELO,
+    MI.NOMBRE AS NOMBRE_SUBSISTEMA,
+    MI.COD_ITEM AS CODIGO_SUBSISTEMA,
+    DP2.COD_DESPIECE_PADRE AS CODIGO_CATEGORIA,
+    DP3.NOMBRE_E AS NOMBRE_CATEGORIA,
+    DP4.NOMBRE_E AS NOMBRE_MARCA,
+    DP4.COD_DESPIECE AS CODIGO_MARCA,
+    L.COD_AGENCIA,
+    B.BODEGA,
+    B.NOMBRE AS NOMBRE_BODEGA,
+    L.COD_UNIDAD,
+    L.PRECIO,
+    P.VOLUMEN AS PESO,
+    COALESCE(RPA.ANIO_DESDE, NULL) AS FROM_YEAR,
+    COALESCE(RPA.ANIO_HASTA, NULL) AS TO_YEAR
+FROM
+    ST_PRODUCTO_DESPIECE D
+    JOIN ST_DESPIECE DP ON D.COD_DESPIECE = DP.COD_DESPIECE AND D.EMPRESA = DP.EMPRESA
+    JOIN PRODUCTO P ON P.EMPRESA = D.EMPRESA AND D.COD_PRODUCTO = P.COD_PRODUCTO
+    JOIN TG_MODELO_ITEM MI ON MI.EMPRESA = P.EMPRESA AND P.COD_MODELO_CAT1 = MI.COD_MODELO AND P.COD_ITEM_CAT1 = MI.COD_ITEM
+    JOIN ST_DESPIECE DP2 ON DP2.EMPRESA = D.EMPRESA AND DP.COD_DESPIECE_PADRE = DP2.COD_DESPIECE
+    JOIN ST_DESPIECE DP3 ON DP3.EMPRESA = DP2.EMPRESA AND DP2.COD_DESPIECE_PADRE = DP3.COD_DESPIECE
+    JOIN ST_DESPIECE DP4 ON DP4.EMPRESA = DP3.EMPRESA AND DP3.COD_DESPIECE_PADRE = DP4.COD_DESPIECE
+    JOIN ST_COLOR C ON C.COD_COLOR = P.PARTIDA
+    JOIN ST_PRODUCTO_BUFFER BUF ON BUF.COD_PRODUCTO = P.COD_PRODUCTO AND BUF.EMPRESA = P.EMPRESA
+    JOIN ST_LISTA_PRECIO L ON L.COD_PRODUCTO = P.COD_PRODUCTO AND L.COD_AGENCIA = 50 AND L.COD_UNIDAD = P.COD_UNIDAD AND L.COD_FORMA_PAGO = 'EFE' AND L.COD_DIVISA = 'DOLARES' AND L.COD_MODELO_CLI = 'CLI1' AND L.COD_ITEM_CLI = 'CF' AND L.ESTADO_GENERACION = 'R' AND (L.FECHA_FINAL IS NULL OR L.FECHA_FINAL >= TRUNC(SYSDATE))
+    JOIN BODEGA B ON B.EMPRESA = L.EMPRESA AND B.BODEGA = L.COD_AGENCIA
+    JOIN ST_MATERIAL_IMAGEN IM ON IM.COD_TIPO_MATERIAL = 'PRO' AND IM.COD_MATERIAL = P.COD_PRODUCTO AND IM.EMPRESA = P.EMPRESA
+    LEFT JOIN ST_PRODUCTO_REP_ANIO RPA ON RPA.EMPRESA = MI.EMPRESA AND RPA.COD_PRODUCTO = P.COD_PRODUCTO
+WHERE
+    DP.EMPRESA = 20
+    AND EXISTS (
+        SELECT 1
+        FROM ST_FORMULA F
+        WHERE F.EMPRESA = DP.EMPRESA
+          AND F.COD_PRODUCTO = P.COD_PRODUCTO
+    )
+    AND (SELECT KS_INVENTARIO.consulta_existencia(
+                        DP.EMPRESA,
+                        L.COD_AGENCIA,
+                        P.COD_PRODUCTO,
+                        'U',
+                        TO_DATE(SYSDATE, 'YYYY/MM/DD'),
+                        1,
+                        'Z',
+                        1
+                    )
+                    FROM dual) > 0
 
+        """
+        valor_politica_ecommerce = get_politica_credito_ecommerce()
+        cursor.execute(sql)
+        results = []
+        for row in cursor.fetchall():
+            #host = '192.168.30.8:5000'
+            host = '200.105.245.182:5000'
+            result_dict = {
+                'COD_PRODUCTO': row[0],
+                'NOMBRE_PRODUCTO': row[1],
+                'IVA': row[2],
+                'ICE': row[3],
+                'COLOR': row[4],
+                'CONTROL_BUFFER': row[5],
+                'CODIGO_MODELO_MOTO': row[6],
+                'MOTO_MODELO': row[7],
+                'NOMBRE_SUBSISTEMA': row[8],
+                'CODIGO_SUBSISTEMA': row[9],
+                'CODIGO_CATEGORIA': row[10],
+                'NOMBRE_CATEGORIA': row[11],
+                'NOMBRE_MARCA': row[12],
+                'CODIGO_MARCA': row[13],
+                'COD_AGENCIA': row[14],
+                'BODEGA': row[15],
+                'NOMBRE_BODEGA': row[16],
+                'COD_UNIDAD': row[17],
+                'PRECIO': round(row[18]*valor_politica_ecommerce,2),
+                'PESO': row[19],
+                'ANIO_DESDE': row[20],
+                'ANIO_HASTA': row[21]
+            }
+            results.append(result_dict)
+        return jsonify(results)
+
+    except Exception as e:
+        print(e)
+        return jsonify({'error': str(e)})
+def get_politica_credito_ecommerce():
+    try:
+        # Establece la conexión
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+
+        # Define y ejecuta la consulta SQL
+        sql = """
+                select factor_credito from st_politica_credito_d a
+                where a.num_cuotas=0
+                and   a.cod_politica=4
+        """
+        cursor.execute(sql)
+        rules_politica = cursor.fetchone()
+        if rules_politica:
+            result = rules_politica[0]
+        else:
+            # Si no hay resultado, asigna un valor por defecto o maneja el caso adecuadamente
+            result = None
+        return result
+    except cx_Oracle.DatabaseError as e:
+        print(f"Error de base de datos: {e}")
+    finally:
+        # Asegúrate de cerrar el cursor y la conexión
+        if cursor:
+            cursor.close()
+        if c:
+            c.close()
 
 
 ##---------------------------------------------------------------------------------
