@@ -1937,34 +1937,33 @@ WHERE
     except Exception as e:
         print(e)
         return jsonify({'error': str(e)})
-def get_politica_credito_ecommerce():
+
+##---------------------------------------------------------------------------------WEB SERVER DE CONSULTA DE INVENTARIO JAHER-------------------------------------------------------------
+
+@web_services.route("/stock_available", methods=["GET"])
+def stock_available():
     try:
-        # Establece la conexión
         c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
-        cursor = c.cursor()
-
-        # Define y ejecuta la consulta SQL
+        cur_01 = c.cursor()
+        id = request.args.get('id', None)
+        if id is None:
+            return jsonify(
+                {"error": "Se requieren ambos parámetros ID/RUC de cliente."}), 400
         sql = """
-                select factor_credito from st_politica_credito_d a
-                where a.num_cuotas=0
-                and   a.cod_politica=4
-        """
-        cursor.execute(sql)
-        rules_politica = cursor.fetchone()
-        if rules_politica:
-            result = rules_politica[0]
-        else:
-            # Si no hay resultado, asigna un valor por defecto o maneja el caso adecuadamente
-            result = None
-        return result
-    except cx_Oracle.DatabaseError as e:
-        print(f"Error de base de datos: {e}")
-    finally:
-        # Asegúrate de cerrar el cursor y la conexión
-        if cursor:
-            cursor.close()
-        if c:
-            c.close()
+                SELECT * FROM VT_ASIGNACION_CUPO V
+                WHERE V.RUC_CLIENTE = :id 
+                """
 
+        cursor = cur_01.execute(sql, [id])
+        c.close
+        row_headers = [x[0] for x in cursor.description]
+        array = cursor.fetchall()
+        modelos = []
+        for result in array:
+            modelo = dict(zip(row_headers, result))
+            modelos.append(modelo)
+        return json.dumps(modelos)
+    except Exception as ex:
+        raise Exception(ex)
+    return response_body
 
-##---------------------------------------------------------------------------------
