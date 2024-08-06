@@ -1802,7 +1802,37 @@ def stock_available():
             return jsonify(
                 {"error": "Se requieren ambos parámetros 'PEDIDO EXTERNO(code)' Y 'RUC (id)' en la solicitud."}), 400
         sql = """
-                SELECT * FROM VT_ASIGNACION_CUPO V
+                SELECT * FROM  VT_ASIGNACION_CUPO V
+                WHERE V.RUC_CLIENTE = :id 
+                """
+
+        cursor = cur_01.execute(sql, [id])
+        c.close
+        row_headers = [x[0] for x in cursor.description]
+        array = cursor.fetchall()
+        modelos = []
+        for result in array:
+            modelo = dict(zip(row_headers, result))
+            modelos.append(modelo)
+        return json.dumps(modelos)
+    except Exception as ex:
+        raise Exception(ex)
+    return response_body
+
+@web_services.route("/assign_serial", methods=["GET"])
+def assign_serial():
+    try:
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur_01 = c.cursor()
+        id = request.args.get('id', None)
+        cod_agencia=request.args.get('cod_agencia', None)
+        cantidad=request.args.get('cantidad', None)
+
+        if id is None:
+            return jsonify(
+                {"error": "Se requieren ambos parámetros 'PEDIDO EXTERNO(code)' Y 'RUC (id)' en la solicitud."}), 400
+        sql = """
+                SELECT * FROM  VT_ASIGNACION_CUPO V
                 WHERE V.RUC_CLIENTE = :id 
                 """
 
