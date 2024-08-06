@@ -1938,6 +1938,60 @@ WHERE
         print(e)
         return jsonify({'error': str(e)})
 
+@web_services.route('/politicas_b2b_ecommerce', methods=['GET'])
+def get_politicas_b2b_ecommerce():
+    try:
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+        sql = """
+            SELECT 
+                p.cod_politica, 
+                p.cod_tipo_clienteh, 
+                c.num_cuotas, 
+                c.factor_credito, 
+                c.es_activo
+            FROM 
+                st_pol_cre_tipo_cliente p
+            JOIN 
+                ST_POLITICA_CREDITO_D c 
+                ON p.cod_politica = c.cod_politica 
+                AND p.empresa = c.empresa
+            WHERE 
+                p.empresa = 20
+                AND (
+                    p.cod_politica = 3 
+                    OR (p.cod_politica = 16 AND p.cod_tipo_clienteh = 'TA')
+                )
+                AND c.num_cuotas <= 3
+            """
+        cursor.execute(sql)
+        results = {}
+
+        for row in cursor.fetchall():
+            cod_clienteh = row[1]
+            cuotas_info = {
+                'num_cuotas': row[2],
+                'factor_credito': row[3],
+                'es_activo': row[4]
+            }
+
+            if cod_clienteh not in results:
+                results[cod_clienteh] = []
+
+            results[cod_clienteh].append(cuotas_info)
+
+        # Formatear la respuesta en dos elementos con la estructura solicitada
+        formatted_results = [
+            {'COD_CLIENTEH': key, 'cuotas_info': value} for key, value in results.items()
+        ]
+
+        return jsonify(formatted_results)
+
+    except Exception as e:
+        print(e)
+        return jsonify({'error': str(e)})
+
+
 ##---------------------------------------------------------------------------------WEB SERVER DE CONSULTA DE INVENTARIO JAHER-------------------------------------------------------------
 
 @web_services.route("/stock_available", methods=["GET"])
