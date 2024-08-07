@@ -1992,6 +1992,39 @@ def get_politicas_b2b_ecommerce():
         return jsonify({'error': str(e)})
 
 
+@web_services.route('/get_info_transportista_ecommerce', methods=['GET'])
+def get_data_transportistas_activos():  # Endpoint to get data of active transportistas
+    try:
+        empresa = 20  # default value or get from request args if needed
+
+        # Establish database connection
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+
+        # Execute the query
+        cursor.execute("""
+            SELECT cod_transportista, nombre, apellido1, direccion, telefono, es_activo, placa
+            FROM ST_TRANSPORTISTA
+            WHERE empresa = :empresa
+              AND es_activo = 1
+        """, empresa=empresa)
+
+        transportistas = cursor.fetchall()
+        transportistas_list = []
+        for transportista in transportistas:
+            transportistas_list.append({
+                'RUC': transportista[0] if transportista[0] is not None else '',
+                'RAZON_SOCIAL': f"{transportista[1]} {transportista[2]}" if transportista[1] is not None and
+                                                                            transportista[2] is not None else ''
+            })
+
+        c.close()
+        return jsonify({'transportistas': transportistas_list}), 200
+    except Exception as e:
+        print(e)
+        return str(e), 500
+
+
 ##---------------------------------------------------------------------------------WEB SERVER DE CONSULTA DE INVENTARIO JAHER-------------------------------------------------------------
 
 @web_services.route("/stock_available", methods=["GET"])
