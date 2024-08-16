@@ -1992,10 +1992,10 @@ def assign_serial():
 
         sql = """
                 SELECT P.ANIO, P.CAMVCPN, P.CILINDRAJE, P.CLASE, P.COD_CHASIS, P.COD_COLOR, P.COD_MOTOR, 
-                   X.COD_PRODUCTO, X.DESCRIPCION, P.FECHA_ADICION, P.MARCA, P.MODELO, X.NUMERO_SERIE, 
+                   X.COD_PRODUCTO, X.DESCRIPCION, P.MARCA, P.MODELO, X.NUMERO_SERIE, 
                    P.OCUPANTES, P.PAIS_ORIGEN, P.POTENCIA, P.SECUENCIA_IMPRONTA, P.SUBCLASE, P.TONELAJE  
             FROM (
-                  SELECT CODIGO_EXTERNO, DESCRIPCION, COD_PRODUCTO, NUMERO_SERIE, edad_meses 
+                  SELECT CODIGO_EXTERNO, DESCRIPCION, COD_PRODUCTO, NUMERO_SERIE, ks_inventario_serie.obt_fecha_produccion_sb(20 ,NUMERO_SERIE,5) as fecha_produccion  
                   FROM (
                         SELECT P.COD_PRODUCTO_CLI AS CODIGO_EXTERNO, Y.DESCRIPCION, S.RUC_CLIENTE,
                         S.PORCENTAJE_MAXIMO, S.Cantidad_Minima, Y.COD_PRODUCTO_TERMINADO AS COD_PRODUCTO,
@@ -2044,7 +2044,7 @@ def assign_serial():
                       AND S.RUC_CLIENTE = P.COD_CLIENTE) 
                  WHERE CODIGO_EXTERNO = :cod_ext
                  OR COD_PRODUCTO = :cod_producto 
-                 ORDER BY EDAD_MESES DESC) X, 
+                 ORDER BY fecha_produccion ) X, 
             ST_PROD_PACKING_LIST P 
             WHERE P.COD_MOTOR = X.NUMERO_SERIE 
             AND ROWNUM <= :cantidad
