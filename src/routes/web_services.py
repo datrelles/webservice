@@ -2197,7 +2197,7 @@ def stock_available():
             return jsonify(
                 {"error": "Se requieren ambos parámetros ID/RUC de cliente."}), 400
         sql = """
-                SELECT * FROM VT_ASIGNACION_CUPO V
+                SELECT * FROM  VT_ASIGNACION_CUPO V
                 WHERE V.RUC_CLIENTE = :id 
                 """
 
@@ -2210,6 +2210,105 @@ def stock_available():
             modelo = dict(zip(row_headers, result))
             modelos.append(modelo)
         return json.dumps(modelos)
+    except Exception as ex:
+        raise Exception(ex)
+    return response_body
+
+@web_services.route("/assign_serial", methods=["GET"])
+def assign_serial():
+    try:
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur_01 = c.cursor()
+        id = request.args.get('id', None)
+        cod_ext = request.args.get('cod_ext', None)
+        cod_producto = request.args.get('cod_producto', None)
+        cod_agencia = request.args.get('cod_agencia', None)
+        cantidad = request.args.get('cantidad', None)
+
+        if id is None or cod_agencia is None or cantidad is None:
+            return jsonify(
+                {"error": "Faltan campos requeridos"}), 500
+
+        if id == '' or cod_agencia == '' or cantidad == '':
+            return jsonify(
+                {"error": "Campos nulos"}), 500
+
+        if cod_producto is None or cod_ext is None:
+            return jsonify(
+                {"error": "Ingrese al menos código externo o código producto"}), 500
+
+        sql = """
+                SELECT P.ANIO, P.CAMVCPN, P.CILINDRAJE, P.CLASE, P.COD_CHASIS, P.COD_COLOR, P.COD_MOTOR, 
+                   X.COD_PRODUCTO, X.DESCRIPCION, P.MARCA, P.MODELO, X.NUMERO_SERIE, 
+                   P.OCUPANTES, P.PAIS_ORIGEN, P.POTENCIA, P.SECUENCIA_IMPRONTA, P.SUBCLASE, P.TONELAJE  
+            FROM (
+                  SELECT CODIGO_EXTERNO, DESCRIPCION, COD_PRODUCTO, NUMERO_SERIE, ks_inventario_serie.obt_fecha_produccion_sb(20 ,NUMERO_SERIE,5) as fecha_produccion  
+                  FROM (
+                        SELECT P.COD_PRODUCTO_CLI AS CODIGO_EXTERNO, Y.DESCRIPCION, S.RUC_CLIENTE,
+                        S.PORCENTAJE_MAXIMO, S.Cantidad_Minima, Y.COD_PRODUCTO_TERMINADO AS COD_PRODUCTO,
+                        Y.NUMERO_SERIE, Y.EDAD_MESES
+                        FROM
+                        ST_ASIGNACION_CUPO S,
+                        ST_PRODUCTO_CLIENTE P,
+                        (
+                        SELECT v.COD_PRODUCTO, v.DESCRIPCION, v.NUMERO_SERIE, B.COD_PRODUCTO_TERMINADO, v.edad_meses
+                        FROM
+                        vt_inventario_sin_bat v
+                        JOIN ST_PROD_FORMULA_D A ON v.COD_PRODUCTO = A.COD_PRODUCTO_INSUMO
+                        JOIN ST_PROD_FORMULA B ON
+                            A.COD_FORMULA = B.COD_FORMULA AND
+                            A.COD_TIPO_FORMULA = B.COD_TIPO_FORMULA AND
+                            A.EMPRESA = B.EMPRESA
+                        WHERE
+                        B.EMPRESA = 20 AND
+                        A.ES_MOTOR = 1 AND
+                        v.COD_BODEGA = 5 AND
+                        EXISTS (
+                            SELECT *
+                                   FROM ST_PROD_FORMULA_D B
+                                   WHERE
+                                    v.COD_PRODUCTO = B.COD_PRODUCTO_INSUMO AND
+                                    v.EMPRESA = B.EMPRESA AND
+                                    B.ES_MOTOR = 1) 
+                        AND
+                        EXISTS (
+                            SELECT *
+                            FROM ST_PROD_FORMULA_D B, ST_PROD_FORMULA C, STA_MOVIMIENTO D
+                            WHERE
+                                v.COD_PRODUCTO = B.COD_PRODUCTO_INSUMO AND
+                                v.EMPRESA = B.EMPRESA AND
+                                B.ES_MOTOR = 1 AND
+                                B.EMPRESA = C.EMPRESA AND
+                                B.COD_FORMULA = C.COD_FORMULA AND
+                                B.COD_TIPO_FORMULA = C.COD_TIPO_FORMULA AND
+                                C.EMPRESA = D.EMPRESA AND
+                                C.COD_PRODUCTO_TERMINADO = D.COD_PRODUCTO
+                        )
+                        ) Y
+                      WHERE Y.COD_PRODUCTO_TERMINADO = S.COD_PRODUCTO
+                      AND Y.COD_PRODUCTO_TERMINADO = P.COD_PRODUCTO
+                      AND S.COD_PRODUCTO = P.COD_PRODUCTO
+                      AND S.RUC_CLIENTE = P.COD_CLIENTE) 
+                 WHERE CODIGO_EXTERNO = :cod_ext
+                 OR COD_PRODUCTO = :cod_producto 
+                 ORDER BY fecha_produccion ) X, 
+            ST_PROD_PACKING_LIST P 
+            WHERE P.COD_MOTOR = X.NUMERO_SERIE 
+            AND ROWNUM <= :cantidad
+                """
+
+        cursor = cur_01.execute(sql, [cod_ext, cod_producto, cantidad])
+        c.close
+        row_headers = [x[0] for x in cursor.description]
+        array = cursor.fetchall()
+        series = []
+        for result in array:
+            serie = dict(zip(row_headers, result))
+            for key, value in serie.items():
+                if isinstance(value, datetime):
+                    serie[key] = value.strftime("%d/%m/%Y")
+            series.append(serie)
+        return jsonify(series)
     except Exception as ex:
         raise Exception(ex)
     return response_body
