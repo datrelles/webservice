@@ -1458,8 +1458,8 @@ def save_invoice_cf_parts():
         flag_save_bill = save_data_bill_extended(data_invoice, empresa)
         if flag_save_bill == True:
             # -----------------------------------------------------------------------
-            number = random.randint(1, 100)
-            message = f"F1-0653{number}"
+            number = random.randint(1, 10000)
+            message = f"FE-{number}"
             return jsonify(
                 {"message": "Transaction completed successfully", "data": data_invoice, "order_code": message}), 200
         else:
@@ -2184,6 +2184,175 @@ def parts_ecommerce_recomended_b2b():
         print(e)
         return jsonify({'error': str(e)})
 
+@web_services.route('/save_invoice/cf1/credito_directo', methods=['POST'])
+def save_invoice_cf1_credito_directo():
+    try:
+        data_invoice = json.loads(request.data)
+        empresa = 20  # for this WS default 20 = massline
+        if not data_invoice:
+            return jsonify({"error": "No input data provided"}), 400
+
+        # Validate received data
+        is_valid, error_message = validate_data_credito_directo(data_invoice)
+        if not is_valid:
+            return jsonify({"error": "Missing data", "details": error_message}), 400
+
+        #-----------------------OPERATION --------------------------------------
+        flag_save_bill = save_data_bill_credito_directo(data_invoice, empresa)
+        if flag_save_bill == True:
+            # Generate FE-{number}{day}{mes}{año} code
+            c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+            cursor = c.cursor()
+            try:
+                # Count existing records
+                cursor.execute("SELECT COUNT(*) FROM ST_CAB_CREDITO_DIRECTO")
+                record_count = cursor.fetchone()[0]
+
+                # Get current date components
+                day = datetime.now().day
+                mes = datetime.now().month
+                año = datetime.now().year
+
+                # Generate order code
+                order_code = f"FE-{record_count}{day:02d}{mes:02d}{año}"
+
+            finally:
+                cursor.close()
+
+            return jsonify({"message": "Transaction completed successfully", "data": data_invoice, "order_code": order_code}), 200
+        else:
+            return jsonify({"error": flag_save_bill})
+    except Exception as e:
+        return str(e)
+
+def validate_data_credito_directo(data):
+    # List of required fields at top level
+    required_fields = ['transactionId', 'total', 'subTotal', 'discountPercentage', 'discountAmount', 'currency', 'cuotas']
+
+    # Verify that all top-level fields are present and not empty
+    for field in required_fields:
+        if field not in data or data[field] in [None, '']:
+            return False, f"Missing or empty field: {field}"
+
+    # If cod_products exists, verify that it's a non-empty list
+    if 'cod_products' in data:
+        cod_products = data['cod_products']
+        if not (isinstance(cod_products, list) and len(cod_products) > 0):
+            return False, "cod_products must be a non-empty list if provided"
+
+    return True, None
+
+def save_data_bill_credito_directo(data_invoice, empresa):
+    # Extract data from JSON
+    id_transaction = data_invoice['transactionId']
+    internal_transaction_reference = data_invoice.get('internalTransactionReference')  # Optional field
+    total = data_invoice['total']
+    sub_total = data_invoice['subTotal']
+    discount_percentage = data_invoice['discountPercentage']
+    discount_amount = data_invoice['discountAmount']
+    currency = data_invoice['currency']
+    id_guia_servientrega = data_invoice.get('idGuiaServientrega')  # Optional field
+    client_type_id = data_invoice['client'].get('typeId') if 'client' in data_invoice else None
+    client_name = data_invoice['client'].get('name') if 'client' in data_invoice else None
+    client_last_name = data_invoice['client'].get('lastName') if 'client' in data_invoice else None
+    client_id = data_invoice['client'].get('clientId') if 'client' in data_invoice else None
+    client_address = data_invoice['client'].get('address') if 'client' in data_invoice else None
+    cost_shiping = data_invoice.get('costShipingCalculate')  # Optional field
+    shiping_discount = data_invoice.get('shipingDiscount')  # Optional field
+    cod_orden_ecommerce = data_invoice.get('codOrdenEcommerce')  # Optional field
+    cod_comprobante = data_invoice.get('codComprobante')  # Optional field
+    cuotas = data_invoice['cuotas']
+    estado_aprobacion = data_invoice.get('estadoAprobacion')  # Optional field
+    descripcion = data_invoice.get('descripcion')  # Optional field
+    id_agencia_transporte = data_invoice.get('idAgenciaTransporte')  # Optional field
+    nombre_agencia_transporte = data_invoice.get('nombreAgenciaTransporte')  # Optional field
+    cod_products = data_invoice.get('cod_products')  # Optional field
+
+    c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+    cursor = c.cursor()
+    try:
+        # Insert into ST_CAB_CREDITO_DIRECTO
+        cursor.execute(
+            """ INSERT INTO ST_CAB_CREDITO_DIRECTO (
+                empresa, id_transaction, internal_transaction_reference, total, sub_total, discount_percentage, discount_amount, currency, id_guia_servientrega,
+                client_type_id, client_name, client_last_name, client_id, client_address, cost_shiping, shiping_discount, cod_orden_ecommerce, cod_comprobante, cuotas, estado_aprobacion, descripcion, id_agencia_transporte, nombre_agencia_transporte
+            ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17, :18, :19, :20, :21, :22, :23) """,
+            (empresa, id_transaction, internal_transaction_reference, total, sub_total, discount_percentage, discount_amount, currency,
+             id_guia_servientrega, client_type_id, client_name, client_last_name, client_id, client_address, cost_shiping,  shiping_discount,
+             cod_orden_ecommerce, cod_comprobante, cuotas, estado_aprobacion, descripcion, id_agencia_transporte, nombre_agencia_transporte))
+
+        # Insert into ST_DET_CREDITO_DIRECTO if cod_products is provided
+        if cod_products:
+            for product in cod_products:
+                cursor.execute(
+                    """
+                    INSERT INTO ST_DET_CREDITO_DIRECTO (empresa, id_transaction, cod_producto, price, quantity)
+                    VALUES (:1, :2, :3, :4, :5)                                     
+                    """, (empresa, id_transaction, product['codProducto'], product['price'], product['quantity'])
+                )
+        c.commit()
+        return True
+    except Exception as e:
+        c.rollback()
+        return str(e)
+    finally:
+        cursor.close()
+
+
+@web_services.route('/get_client_orders_ecommerce/<client_id>', methods=['GET'])
+def get_client_orders_ecommerce(client_id):
+    try:
+        empresa = 20  # Default Massline
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+        client_id=str(client_id)
+        # Consultar registros de la tabla ST_CAB_CREDITO_DIRECTO
+        cursor.execute("""
+            SELECT * FROM ST_CAB_CREDITO_DIRECTO 
+            WHERE empresa = :empresa AND client_id010101010101 = :client_id
+        """, {'empresa': empresa, 'client_id': client_id})
+
+        records = cursor.fetchall()
+        columns = [col[0] for col in cursor.description]
+        result = [dict(zip(columns, record)) for record in records]
+
+        # Ejecutar funciones PL/SQL para obtener valores adicionales
+        total_x_vencer = get_balance_function(cursor, 'ksa_balance_cartera.total_x_vencer', empresa, client_id)
+        total_vencido = get_balance_function(cursor, 'ksa_balance_cartera.total_vencido', empresa, client_id)
+        total_deuda = get_balance_function(cursor, 'ksa_balance_cartera.total_deuda', empresa, client_id)
+
+        # Añadir valores adicionales al resultado
+        response = {
+            "records": result,
+            "total_x_vencer": total_x_vencer,
+            "total_vencido": total_vencido,
+            "total_deuda": total_deuda
+        }
+
+        return jsonify(response)
+    except Exception as e:
+        print(e)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        c.close()
+
+def get_balance_function(cursor, function_name, empresa, client_id):
+    try:
+        # Ejecuta la función desde DUAL para obtener el resultado
+        cursor.execute(f"""
+            SELECT {function_name}(:param1, :param2) AS resultado
+            FROM dual
+        """, param1=empresa, param2=client_id)
+
+        # Obtiene el resultado de la consulta
+        result = cursor.fetchone()
+
+        # Devuelve el resultado convertido a float
+        return float(result[0]) if result and result[0] is not None else None
+    except Exception as e:
+        print(f"Error en la llamada a la función {function_name}: {e}")
+        return None  # Manejo de errores
 
 ##---------------------------------------------------------------------------------WEB SERVER DE CONSULTA DE INVENTARIO JAHER-------------------------------------------------------------
 
