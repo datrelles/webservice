@@ -2309,7 +2309,7 @@ def get_client_orders_ecommerce(client_id):
         # Consultar registros de la tabla ST_CAB_CREDITO_DIRECTO
         cursor.execute("""
             SELECT * FROM ST_CAB_CREDITO_DIRECTO 
-            WHERE empresa = :empresa AND client_id010101010101 = :client_id
+            WHERE empresa = :empresa AND client_id = :client_id
         """, {'empresa': empresa, 'client_id': client_id})
 
         records = cursor.fetchall()
