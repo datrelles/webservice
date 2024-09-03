@@ -2224,7 +2224,6 @@ def save_invoice_cf1_credito_directo():
             return jsonify({"error": flag_save_bill})
     except Exception as e:
         return str(e)
-
 def validate_data_credito_directo(data):
     # List of required fields at top level
     required_fields = ['transactionId', 'total', 'subTotal', 'discountPercentage', 'discountAmount', 'currency', 'cuotas']
@@ -2241,7 +2240,6 @@ def validate_data_credito_directo(data):
             return False, "cod_products must be a non-empty list if provided"
 
     return True, None
-
 def save_data_bill_credito_directo(data_invoice, empresa):
     # Extract data from JSON
     id_transaction = data_invoice['transactionId']
@@ -2298,7 +2296,6 @@ def save_data_bill_credito_directo(data_invoice, empresa):
     finally:
         cursor.close()
 
-
 @web_services.route('/get_client_orders_ecommerce/<client_id>', methods=['GET'])
 def get_client_orders_ecommerce(client_id):
     try:
@@ -2336,7 +2333,6 @@ def get_client_orders_ecommerce(client_id):
     finally:
         cursor.close()
         c.close()
-
 def get_balance_function(cursor, function_name, empresa, client_id):
     try:
         # Ejecuta la función desde DUAL para obtener el resultado
@@ -2354,8 +2350,247 @@ def get_balance_function(cursor, function_name, empresa, client_id):
         print(f"Error en la llamada a la función {function_name}: {e}")
         return None  # Manejo de errores
 
-##---------------------------------------------------------------------------------WEB SERVER DE CONSULTA DE INVENTARIO JAHER-------------------------------------------------------------
+@web_services.route('/save_invoice/deuna_b2b', methods=['POST'])
+def save_invoice_deuna_b2b():
+    try:
+        data_invoice = json.loads(request.data)
+        empresa = 20  # for this WS default 20 = massline
+        if not data_invoice:
+            return jsonify({"error": "No input data provided"}), 400
 
+        # Validate received data
+        is_valid, error_message = validate_data_deuna_b2b(data_invoice)
+        if not is_valid:
+            return jsonify({"error": "Missing data", "details": error_message}), 400
+
+        #-----------------------OPERATION --------------------------------------
+        flag_save_bill = save_data_bill_deuna_b2b(data_invoice, empresa)
+        if flag_save_bill == True:
+            # Generate DEUNA-{number}{day}{mes}{año} code
+            c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+            cursor = c.cursor()
+            try:
+                # Count existing records
+                cursor.execute("SELECT COUNT(*) FROM ST_CAB_DEUNA_B2B")
+                record_count = cursor.fetchone()[0]
+
+                # Get current date components
+                day = datetime.now().day
+                mes = datetime.now().month
+                año = datetime.now().year
+
+                # Generate order code
+                order_code = f"DEUNA-{record_count}{day:02d}{mes:02d}{año}"
+
+            finally:
+                cursor.close()
+
+            return jsonify({"message": "Transaction completed successfully", "data": data_invoice, "order_code": order_code}), 200
+        else:
+            return jsonify({"error": flag_save_bill})
+    except Exception as e:
+        return str(e)
+def validate_data_deuna_b2b(data):
+    # List of required fields at top level
+    required_fields = ['transactionId', 'total', 'subTotal']
+
+    # Verify that all top-level fields are present and not empty
+    for field in required_fields:
+        if field not in data or data[field] in [None, '']:
+            return False, f"Missing or empty field: {field}"
+
+    # If cod_products exists, verify that it's a non-empty list
+    if 'cod_products' in data:
+        cod_products = data['cod_products']
+        if not (isinstance(cod_products, list) and len(cod_products) > 0):
+            return False, "cod_products must be a non-empty list if provided"
+
+    return True, None
+def save_data_bill_deuna_b2b(data_invoice, empresa):
+    # Extract data from JSON with None defaults for optional fields
+    id_transaction = data_invoice['transactionId']
+    internal_transaction_reference = data_invoice.get('internalTransactionReference', None)
+    total = data_invoice['total']
+    sub_total = data_invoice['subTotal']
+    discount_percentage = data_invoice.get('discountPercentage', None)
+    discount_amount = data_invoice.get('discountAmount', None)
+    currency = data_invoice.get('currency', None)
+    id_guia_servientrega = data_invoice.get('idGuiaServientrega', None)
+    client_type_id = data_invoice.get('client', {}).get('typeId', None)
+    client_name = data_invoice.get('client', {}).get('name', None)
+    client_last_name = data_invoice.get('client', {}).get('lastName', None)
+    client_id = data_invoice.get('client', {}).get('clientId', None)
+    client_address = data_invoice.get('client', {}).get('address', None)
+    cost_shiping = data_invoice.get('costShiping', None)
+    cod_orden_ecommerce = data_invoice.get('codOrdenEcommerce', None)
+    cod_comprobante = data_invoice.get('codComprobante', None)
+    number_of_payment = data_invoice.get('numberOfPayment', None)
+    shiping_discount = data_invoice.get('shipingDiscount', None)
+    descripcion = data_invoice.get('descripcion', None)
+    id_agencia_transporte = data_invoice.get('idAgenciaTransporte', None)
+    nombre_agencia_transporte = data_invoice.get('nombreAgenciaTransporte', None)
+    cod_products = data_invoice.get('cod_products', None)
+
+    c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+    cursor = c.cursor()
+    try:
+        # Insert into ST_CAB_DEUNA_B2B
+        cursor.execute(
+            """ INSERT INTO ST_CAB_DEUNA_B2B (
+                empresa, id_transaction, internal_transaction_reference, total, sub_total, discount_percentage, discount_amount, currency, id_guia_servientrega,
+                client_type_id, client_name, client_last_name, client_id, client_address, cost_shiping, cod_orden_ecommerce, cod_comprobante, fecha, shiping_discount,
+                number_of_payment, descripcion, id_agencia_transporte, nombre_agencia_transporte
+            ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17, SYSDATE, :18, :19, :20, :21, :22) """,
+            (empresa, id_transaction, internal_transaction_reference, total, sub_total, discount_percentage, discount_amount, currency,
+             id_guia_servientrega, client_type_id, client_name, client_last_name, client_id, client_address, cost_shiping,
+             cod_orden_ecommerce, cod_comprobante, shiping_discount, number_of_payment, descripcion, id_agencia_transporte, nombre_agencia_transporte))
+
+        # Insert into ST_DET_DEUNA_B2B if cod_products is provided
+        if cod_products:
+            for product in cod_products:
+                cursor.execute(
+                    """
+                    INSERT INTO ST_DET_DEUNA_B2B (empresa, id_transaction, cod_producto, price, quantity)
+                    VALUES (:1, :2, :3, :4, :5)                                     
+                    """, (empresa, id_transaction, product['codProducto'], product['price'], product['quantity'])
+                )
+        c.commit()
+        return True
+    except Exception as e:
+        c.rollback()
+        return str(e)
+    finally:
+        cursor.close()
+
+@web_services.route('/save_invoice/datafast_b2b', methods=['POST'])
+def save_invoice_datafast_b2b():
+    try:
+        data_invoice = json.loads(request.data)
+        empresa = 20  # for this WS default 20 = massline
+
+        if not data_invoice:
+            return jsonify({"error": "No input data provided"}), 400
+
+        # Validate received data
+        is_valid, error_message = validate_data_datafast_b2b(data_invoice)
+        if not is_valid:
+            return jsonify({"error": "Missing data", "details": error_message}), 400
+
+        # -----------------------OPERATION --------------------------------------
+        flag_save_bill = save_data_bill_datafast_b2b(data_invoice, empresa)
+        if flag_save_bill == True:
+            # Generate DATAFAST-{number}{day}{mes}{año} code
+            c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+            cursor = c.cursor()
+            try:
+                # Count existing records
+                cursor.execute("SELECT COUNT(*) FROM ST_CAB_DATAFAST_B2B")
+                record_count = cursor.fetchone()[0]
+
+                # Get current date components
+                day = datetime.now().day
+                mes = datetime.now().month
+                año = datetime.now().year
+
+                # Generate order code
+                order_code = f"DATAFAST-{record_count}{day:02d}{mes:02d}{año}"
+
+            finally:
+                cursor.close()
+
+            return jsonify(
+                {"message": "Transaction completed successfully", "data": data_invoice, "order_code": order_code}), 200
+        else:
+            return jsonify({"error": flag_save_bill}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+def validate_data_datafast_b2b(data):
+    # List of required fields at top level
+    required_fields = ['transactionId', 'total', 'subTotal']
+
+    # Verify that all top-level fields are present and not empty
+    for field in required_fields:
+        if field not in data or data[field] in [None, '']:
+            return False, f"Missing or empty field: {field}"
+
+    # If cod_products exists, verify that it's a non-empty list
+    if 'cod_products' in data:
+        cod_products = data['cod_products']
+        if not (isinstance(cod_products, list) and len(cod_products) > 0):
+            return False, "cod_products must be a non-empty list if provided"
+
+    return True, None
+def save_data_bill_datafast_b2b(data_invoice, empresa):
+    # Extract data from JSON with None defaults for optional fields
+    id_transaction = data_invoice['transactionId']
+    payment_type = data_invoice.get('paymentType', None)
+    payment_brand = data_invoice.get('paymentBrand', None)
+    total = data_invoice['total']
+    sub_total = data_invoice['subTotal']
+    discount_percentage = data_invoice.get('discountPercentage', None)
+    discount_amount = data_invoice.get('discountAmount', None)
+    currency = data_invoice.get('currency', None)
+    batch_no = data_invoice.get('batchNo', None)
+    id_guia_servientrega = data_invoice.get('idGuiaServientrega', None)
+    card_type = data_invoice.get('cardType', None)
+    bin_card = data_invoice.get('binCard', None)
+    last_4_digits = data_invoice.get('last4Digits', None)
+    holder = data_invoice.get('holder', None)
+    expiry_month = data_invoice.get('expiryMonth', None)
+    expiry_year = data_invoice.get('expiryYear', None)
+    acquirer_code = data_invoice.get('acquirerCode', None)
+    client_type_id = data_invoice.get('client', {}).get('typeId', None)
+    client_name = data_invoice.get('client', {}).get('name', None)
+    client_last_name = data_invoice.get('client', {}).get('lastName', None)
+    client_id = data_invoice.get('client', {}).get('clientId', None)
+    client_address = data_invoice.get('client', {}).get('address', None)
+    cost_shiping_calculate = data_invoice.get('costShipingCalculate', None)
+    shiping_discount = data_invoice.get('shipingDiscount', None)
+    cod_orden_ecommerce = data_invoice.get('codOrdenEcommerce', None)
+    cod_comprobante = data_invoice.get('codComprobante', None)
+    cuotas = data_invoice.get('cuotas', None)
+    descripcion = data_invoice.get('descripcion', None)
+    id_agencia_transporte = data_invoice.get('idAgenciaTransporte', None)
+    nombre_agencia_transporte = data_invoice.get('nombreAgenciaTransporte', None)
+    cod_products = data_invoice.get('cod_products', None)
+
+    c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+    cursor = c.cursor()
+    try:
+        # Insert into ST_CAB_DATAFAST_B2B
+        cursor.execute(
+            """INSERT INTO ST_CAB_DATAFAST_B2B (
+                empresa, id_transaction, payment_type, payment_brand, total, sub_total, discount_percentage, discount_amount, currency, batch_no,
+                id_guia_servientrega, card_type, bin_card, last_4_digits, holder, expiry_month, expiry_year, acquirer_code, client_type_id, client_name,
+                client_last_name, client_id, client_address, cost_shiping_calculate, shiping_discount, cod_orden_ecommerce, cod_comprobante, fecha, cuotas,
+                descripcion, id_agencia_transporte, nombre_agencia_transporte
+            ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17, :18, :19, :20, :21, :22, :23, :24, :25, :26, :27, SYSDATE, :28, :29, :30, :31)""",
+            (empresa, id_transaction, payment_type, payment_brand, total, sub_total, discount_percentage,
+             discount_amount, currency, batch_no,
+             id_guia_servientrega, card_type, bin_card, last_4_digits, holder, expiry_month, expiry_year, acquirer_code,
+             client_type_id, client_name,
+             client_last_name, client_id, client_address, cost_shiping_calculate, shiping_discount, cod_orden_ecommerce,
+             cod_comprobante, cuotas,
+             descripcion, id_agencia_transporte, nombre_agencia_transporte)
+        )
+
+        # Insert into ST_DET_DATAFAST_B2B if cod_products is provided
+        if cod_products:
+            for product in cod_products:
+                cursor.execute(
+                    """INSERT INTO ST_DET_DATAFAST_B2B (empresa, id_transaction, cod_producto, price, quantity)
+                       VALUES (:1, :2, :3, :4, :5)""",
+                    (empresa, id_transaction, product['codProducto'], product['price'], product['quantity'])
+                )
+        c.commit()
+        return True
+    except Exception as e:
+        c.rollback()
+        return str(e)
+    finally:
+        cursor.close()
+
+##---------------------------------------------------------------------------------WEB SERVER DE CONSULTA DE INVENTARIO JAHER-------------------------------------------------------------
 @web_services.route("/stock_available", methods=["GET"])
 def stock_available():
     try:
