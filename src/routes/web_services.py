@@ -2005,6 +2005,7 @@ def get_data_transportistas_activos():  # Endpoint to get data of active transpo
             FROM ST_TRANSPORTISTA
             WHERE empresa = :empresa
               AND es_activo = 1
+              AND activo_ecommerce=1
         """, empresa=empresa)
 
         transportistas = cursor.fetchall()
