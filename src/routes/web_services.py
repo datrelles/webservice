@@ -1214,7 +1214,7 @@ FROM
     ST_PRODUCTO_DESPIECE D
     JOIN ST_DESPIECE DP ON D.COD_DESPIECE = DP.COD_DESPIECE AND D.EMPRESA = DP.EMPRESA
     JOIN PRODUCTO P ON P.EMPRESA = D.EMPRESA AND D.COD_PRODUCTO = P.COD_PRODUCTO
-    JOIN TG_MODELO_ITEM MI ON MI.EMPRESA = P.EMPRESA AND P.COD_MODELO_CAT1 = MI.COD_MODELO AND P.COD_ITEM_CAT1 = MI.COD_ITEM
+    JOIN TG_MODELO_ITEM MI ON MI.EMPRESA = P.EMPRESA AND P.COD_ITEM_CAT1 = MI.COD_ITEM --P.COD_MODELO_CAT1 = MI.COD_MODELO 
     JOIN ST_DESPIECE DP2 ON DP2.EMPRESA = D.EMPRESA AND DP.COD_DESPIECE_PADRE = DP2.COD_DESPIECE
     JOIN ST_DESPIECE DP3 ON DP3.EMPRESA = DP2.EMPRESA AND DP2.COD_DESPIECE_PADRE = DP3.COD_DESPIECE
     JOIN ST_DESPIECE DP4 ON DP4.EMPRESA = DP3.EMPRESA AND DP3.COD_DESPIECE_PADRE = DP4.COD_DESPIECE
@@ -2575,6 +2575,7 @@ def save_data_bill_datafast_b2b(data_invoice, empresa):
         )
 
         # Insert into ST_DET_DATAFAST_B2B if cod_products is provided
+        print(cod_products)
         if cod_products:
             for product in cod_products:
                 cursor.execute(
@@ -2590,7 +2591,10 @@ def save_data_bill_datafast_b2b(data_invoice, empresa):
     finally:
         cursor.close()
 
+
+
 ##---------------------------------------------------------------------------------WEB SERVER DE CONSULTA DE INVENTARIO JAHER-------------------------------------------------------------
+
 @web_services.route("/stock_available", methods=["GET"])
 def stock_available():
     try:
