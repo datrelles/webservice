@@ -2005,6 +2005,7 @@ def get_data_transportistas_activos():  # Endpoint to get data of active transpo
             FROM ST_TRANSPORTISTA
             WHERE empresa = :empresa
               AND es_activo = 1
+              AND activo_ecommerce=1
         """, empresa=empresa)
 
         transportistas = cursor.fetchall()
@@ -2591,6 +2592,89 @@ def save_data_bill_datafast_b2b(data_invoice, empresa):
     finally:
         cursor.close()
 
+@web_services.route('/get_info_moto_shibot_active_warranty', methods=['GET'])
+def get_info_moto_shibot_active_warranty():  # Endpoint to get motorcycle information; requires at least one value: cod_motor, cod_chasis, camvCpn, or placa
+    try:
+        empresa = 20  # Default Massline
+        cod_motor = request.args.get('cod_motor', '').strip()
+        cod_chasis = request.args.get('cod_chasis', '').strip()
+        camvCpn = request.args.get('camvCpn', '').strip()
+        placa = request.args.get('placa', '').strip()
+
+        # Check if at least one parameter is provided
+        if not (cod_motor or cod_chasis or camvCpn or placa):
+            return jsonify({
+                               'error': 'Se necesita al menos uno de los siguientes parámetros: cod_motor, cod_chasis, camvCpn, o placa'}), 400
+
+        # Prepare the query conditions based on provided parameters
+        conditions = []
+        parameters = {'empresa': empresa}
+
+        if cod_motor:
+            conditions.append("b.cod_motor = :cod_motor")
+            parameters['cod_motor'] = cod_motor
+        if cod_chasis:
+            conditions.append("b.cod_chasis = :cod_chasis")
+            parameters['cod_chasis'] = cod_chasis
+        if camvCpn:
+            conditions.append("b.camvcpn = :camvCpn")
+            parameters['camvCpn'] = camvCpn
+        if placa:
+            conditions.append("a.placa = :placa")
+            parameters['placa'] = placa
+
+        # Join conditions with OR
+        where_clause = " OR ".join(conditions)
+
+        # Prepare the database connection
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+
+        # Execute the SQL query with dynamic where clause
+        query = f"""
+                SELECT a.nombre, a.identificacion, a.direccion, a.placa, a.camv_o_cpn, 
+                       b.cod_chasis, b.cod_motor, b.marca, b.modelo, b.anio, 
+                       b.cilindraje, b.potencia, b.color
+                FROM st_matriculacion_motos a, VT_PROD_PACKING_LIST_BI b
+                WHERE a.empresa = :empresa
+                  AND a.camv_o_cpn = b.camvcpn
+                  AND b.empresa = a.empresa
+                  AND ({where_clause})
+            """
+
+        # Execute with the parameters as a dictionary
+        cursor.execute(query, parameters)
+
+        motos = cursor.fetchall()
+        c.close()
+
+        # Format the response
+        if motos:
+            data_motos = [
+                {
+                    'nombre': moto[0],
+                    'identificacion': moto[1],
+                    'direccion': moto[2],
+                    'placa': moto[3],
+                    'camv_o_cpn': moto[4],
+                    'cod_chasis': moto[5],
+                    'cod_motor': moto[6],
+                    'marca': moto[7],
+                    'modelo': moto[8],
+                    'anio': moto[9],
+                    'cilindraje': moto[10],
+                    'potencia': moto[11],
+                    'color': moto[12]
+                } for moto in motos
+            ]
+        else:
+            data_motos = {'estado': 'NO REGISTRADO'}
+
+        return jsonify({'motos': data_motos}), 200
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({'error': 'Error al procesar la solicitud, revise los parámetros y vuelva a intentar.'}), 500
 
 
 ##---------------------------------------------------------------------------------WEB SERVER DE CONSULTA DE INVENTARIO JAHER-------------------------------------------------------------
