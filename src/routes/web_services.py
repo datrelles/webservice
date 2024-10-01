@@ -1269,7 +1269,7 @@ WHERE
                 'BODEGA': row[15],
                 'NOMBRE_BODEGA': row[16],
                 'COD_UNIDAD': row[17],
-                'PRECIO': round(row[18]*valor_politica_ecommerce,2),
+                'PRECIO': round(row[18]*valor_politica_ecommerce,3),
                 'URL_IMAGE': imagen_url,
                 'PESO': row[19],
                 'ANIO_DESDE': row[20],
