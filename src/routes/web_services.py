@@ -1800,7 +1800,7 @@ def get_all_ruc_b2b_customer():
                 from cliente a, cliente_hor b 
                 WHERE a.empresa = :empresa
                 and b.empresah = a.empresa
-                and b.cod_tipo_clienteh IN ('DI', 'DM', 'TA', 'AR', 'MX', 'GA', 'MM','CE')
+                and b.cod_tipo_clienteh IN ('DI', 'DM', 'TA', 'AR', 'MX', 'GA', 'MM','CE','MY','MA')
                 and b.cod_clienteh = a.cod_cliente
             """, empresa=empresa)
 
