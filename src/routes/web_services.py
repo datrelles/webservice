@@ -535,6 +535,85 @@ def saveMatriculas():
     except Exception as e:
         print(e)
         return jsonify({'error': str(e)}), 500
+
+
+@web_services.route('/sri_doc_elec_save', methods=['POST'])
+def save_sri_doc_elec_save():
+    try:
+        data = request.get_json()
+        # Conexión a la base de datos Oracle
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cursor = c.cursor()
+
+        for doc in data:
+            # Verificar si ya existe un registro con el mismo RUC y SERIE_COMPROBANTE
+            cursor.execute(
+                """
+                SELECT 1 FROM CONTABILIDAD.TC_DOC_ELEC_RECIBIDOS 
+                WHERE ruc_emisor = :ruc_emisor AND serie_comprobante = :serie_comprobante
+                """,
+                {
+                    'ruc_emisor': doc.get('RUC_EMISOR'),
+                    'serie_comprobante': doc.get('SERIE_COMPROBANTE')
+                }
+            )
+            exists = cursor.fetchone()
+
+            # Si el registro ya existe, omitir la inserción
+            if exists:
+                continue
+
+            # Convertir las fechas al formato adecuado si están presentes
+            fecha_emision = (
+                datetime.strptime(doc.get('FECHA_EMISION'), '%d/%m/%Y').strftime('%Y-%m-%d')
+                if doc.get('FECHA_EMISION') else None
+            )
+            fecha_autorizacion = (
+                datetime.strptime(doc.get('FECHA_AUTORIZACION'), '%d/%m/%Y %H:%M:%S').strftime('%Y-%m-%d %H:%M:%S')
+                if doc.get('FECHA_AUTORIZACION') else None
+            )
+
+            # Ejecutar la inserción en la tabla
+            cursor.execute(
+                """
+                INSERT INTO CONTABILIDAD.TC_DOC_ELEC_RECIBIDOS (
+                    comprobante, serie_comprobante, ruc_emisor, razon_social_emisor, fecha_emision,
+                    fecha_autorizacion, tipo_emision, numero_documento_modificado, identificacion_receptor,
+                    clave_acceso, numero_autorizacion, importe_total, valor_sin_impuestos, iva
+                ) VALUES (:1, :2, :3, :4, TO_DATE(:5, 'YYYY-MM-DD'), 
+                          TO_DATE(:6, 'YYYY-MM-DD HH24:MI:SS'), :7, :8, :9, :10, :11, :12, :13, :14)
+                """,
+                (
+                    doc.get('TIPO_COMPROBANTE').upper(),  # comprobante
+                    doc.get('SERIE_COMPROBANTE'),  # serie_comprobante
+                    doc.get('RUC_EMISOR'),  # ruc_emisor
+                    doc.get('RAZON_SOCIAL_EMISOR').upper(),  # razon_social_emisor
+                    fecha_emision,  # fecha_emision en formato YYYY-MM-DD
+                    fecha_autorizacion,  # fecha_autorizacion en formato YYYY-MM-DD HH:MM:SS
+                    'NORMAL',  # tipo_emision (valor por defecto)
+                    doc.get('NUMERO_DOCUMENTO_MODIFICADO', ''),  # numero_documento_modificado
+                    doc.get('IDENTIFICACION_RECEPTOR'),  # identificacion_receptor
+                    doc.get('CLAVE_ACCESO'),  # clave_acceso
+                    doc.get('CLAVE_ACCESO'),  # numero_autorizacion
+                    float(doc.get('IMPORTE_TOTAL', 0)),  # importe_total
+                    float(doc.get('VALOR_SIN_IMPUESTOS', 0)),  # valor_sin_impuestos
+                    float(doc.get('IVA', 0))  # iva
+                )
+            )
+
+        # Confirmar la transacción
+        c.commit()
+        return jsonify({'result': 'Transaction completed successfully'}), 200
+
+    except Exception as e:
+        c.rollback()  # Revertir en caso de error
+        print(e)
+        return jsonify({'error': str(e)}), 500
+
+    finally:
+        cursor.close()
+
+
 # WS MODULE WARRANTY
 @web_services.route('/warranty/motorcycles', methods=['POST'])
 def warranty():
