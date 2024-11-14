@@ -541,8 +541,6 @@ def saveMatriculas():
 def save_sri_doc_elec_save():
     try:
         data = request.get_json()
-        print('endpoint Ready')
-        print(data)
         # Conexión a la base de datos Oracle
         c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
         cursor = c.cursor()
@@ -563,8 +561,6 @@ def save_sri_doc_elec_save():
 
             # Si el registro ya existe, omitir la inserción
             if exists:
-                print(
-                    f"Registro con RUC {doc.get('RUC_EMISOR')} y SERIE_COMPROBANTE {doc.get('SERIE_COMPROBANTE')} ya existe. No se insertará.")
                 continue
 
             # Convertir las fechas al formato adecuado si están presentes
