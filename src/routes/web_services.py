@@ -371,7 +371,7 @@ def searchProduct():
                 cod_unidad = resultado[13]
                 precio = resultado[14]
                 stock = resultado[15]
-                host = '200.105.245.182:5000'
+                host = '201.218.59.182:5000'
                 imageurl = f"http://{host}/imageApi/img?code={code}"
 
                 response_data.append({
@@ -1326,7 +1326,7 @@ WHERE
         results = []
         for row in cursor.fetchall():
             #host = '192.168.30.8:5000'
-            host = '200.105.245.182:5000'
+            host = '201.218.59.182:5000'
             imagen_url = f"http://{host}/imageApi/img?code={row[0]}"
             anios = [2020, 2021, 2022]
             result_dict = {
@@ -1985,7 +1985,7 @@ WHERE
         results = []
         for row in cursor.fetchall():
             #host = '192.168.30.8:5000'
-            host = '200.105.245.182:5000'
+            host = '201.218.59.182:5000'
             result_dict = {
                 'COD_PRODUCTO': row[0],
                 'NOMBRE_PRODUCTO': row[1],
@@ -2224,7 +2224,7 @@ def parts_ecommerce_recomended_b2b():
         cursor.execute(sql)
         results = []
         for row in cursor.fetchall():
-            host = '200.105.245.182:5000'
+            host = '201.218.59.182:5000'
             imagen_url = f"http://{host}/imageApi/img?code={row[0]}"
             result_dict = {
                 'COD_PRODUCTO': row[0],
