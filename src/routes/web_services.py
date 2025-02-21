@@ -536,7 +536,6 @@ def saveMatriculas():
         print(e)
         return jsonify({'error': str(e)}), 500
 
-
 @web_services.route('/sri_doc_elec_save', methods=['POST'])
 def save_sri_doc_elec_save():
     try:
@@ -646,11 +645,8 @@ def warranty():
         save_cod_tipo_problema(dataCaso)
         #Guardar evidencias
         save_url_st_casos_postVenta(dataCaso)
-
         return jsonify({"casoData": dataCaso})
-
     except Exception as e:
-        print(e)
         return jsonify({'Error en el registro del caso': str(e)}), 500
 def validar_campos(data):
     campos_necesarios = [
@@ -675,12 +671,14 @@ def set_non_variable_data(data):
     fecha_formateada = datetime.strptime(data['fecha'], '%Y/%m/%d %H:%M:%S')
     data['fecha'] = fecha_formateada
     data['codigo_nacion'] = 1
-    data['codigo_responsable'] = 'WSSHIBOT'
     data['cod_canal'] = 5
     data['adicionado_por'] = 'WSSHIBOT'
     fecha_venta = datetime.strptime(data['fecha_venta'], '%Y/%m')
     data['fecha_venta'] = fecha_venta
     data['aplica_garantia'] = 2
+    codigo_taller_responsable = data.get('codigo_taller')
+    nombre_usuario_responsable = get_codigo_responsable(codigo_taller_responsable)
+    data['codigo_responsable'] = nombre_usuario_responsable
 
 def generate_comprobante_code(data, dataCaso):
     v_cod_empresa = 20
@@ -762,15 +760,12 @@ def get_taller_info(data):
     c.close()
 def get_motor_info(data):
     num_motor = data['cod_motor']
-    print('enter')
     if not num_motor:
         return jsonify({"error": "Se requiere el campo 'cod_motor'"})
 
     data_motor = oracle.infoMotor(num_motor)
     data['cod_producto'] = data_motor[1]
     data['cod_distribuidor_cli'] = data_motor[0]
-    print(data['cod_producto'])
-    print(data['cod_distribuidor_cli'])
 def save_cod_tipo_problema(data):
     c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
     cur = c.cursor()
@@ -843,6 +838,40 @@ def save_url_st_casos_postVenta(data):
     c.commit()
     cur.close()
     c.close()
+def get_codigo_responsable(cod_taller):
+    """
+    get "usuario_responsable" filtrando por empresa=20 y activo=1 y cod_taller.
+    """
+    try:
+        empresa = 20
+        activo = 1
+
+        query = """
+            SELECT usuario 
+            FROM AR_TALLER_SERVICIO_USUARIO
+            WHERE empresa = :empresa AND codigo_taller = :cod_taller AND activo = :activo
+            AND ROWNUM = 1
+        """
+
+        c = oracle.connection(getenv("USERORA"), getenv("PASSWORD"))
+        cur = c.cursor()
+
+        cur.execute(query, empresa=empresa, cod_taller=cod_taller, activo=activo)
+        usuario_responsable = cur.fetchone()
+        print(usuario_responsable)
+
+        cur.close()
+        c.close()
+
+        if usuario_responsable:
+            return usuario_responsable[0]
+        else:
+            return "WSSHIBOT"
+
+    except Exception as e:
+        print(f"Error al obtener código responsable: {str(e)}")
+        return "WSSHIBOT"
+
 
 @web_services.route('/get/cod_tipo_problema', methods=['GET'])
 def get_cod_tipo_problema():
